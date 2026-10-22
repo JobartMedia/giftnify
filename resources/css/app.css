@@ -1,0 +1,225 @@
+@import "tailwindcss";
+
+/* ------------------------------------------------------------------
+   Giftnify design tokens — shared 1:1 with the app (src/styles.css).
+   Ink for text, white/petal surfaces, magenta only for the action that
+   matters, plum reserved for mystery + reveal moments.
+------------------------------------------------------------------- */
+@theme {
+  --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Bricolage Grotesque", "Manrope", ui-sans-serif, system-ui, sans-serif;
+
+  --color-ink: #22101D;
+  --color-ink-soft: #6E5A68;
+  --color-line: #EEE2E9;
+  --color-petal: #FFF0F7;
+  --color-petal-deep: #FCE2EF;
+  --color-magenta: #E5007D;
+  --color-magenta-deep: #B4005E;
+  --color-plum: #2A0B1F;
+  --color-plum-soft: #4A1538;
+  --color-mint: #0E9F6E;
+
+  --ease-out-soft: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@layer base {
+  :root {
+    --background: #ffffff;
+    --foreground: #22101D;
+    --card: #ffffff;
+    --border: #EEE2E9;
+    --primary: #E5007D;
+    --primary-deep: #B4005E;
+    --secondary: #FCE2EF;
+    --secondary-foreground: #B4005E;
+    --blush: #FFF0F7;
+    --muted: #F8F4F6;
+    --muted-foreground: #6E5A68;
+    --plum: #2A0B1F;
+    --plum-foreground: #FFF0F7;
+
+    /* Tinted, low shadows — depth without glow */
+    --shadow-soft: 0 1px 2px rgba(42, 11, 31, 0.04), 0 12px 32px -16px rgba(42, 11, 31, 0.14);
+    --shadow-card: 0 1px 2px rgba(42, 11, 31, 0.05), 0 18px 40px -18px rgba(42, 11, 31, 0.22);
+    --shadow-glow: 0 1px 0 rgba(255, 255, 255, 0.25) inset, 0 10px 24px -12px rgba(180, 0, 94, 0.55);
+    --shadow-icon: 0 6px 10px rgba(180, 0, 94, 0.16);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    letter-spacing: -0.005em;
+    overflow-x: hidden;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1, h2, h3 {
+    font-family: var(--font-display);
+    letter-spacing: -0.025em;
+    text-wrap: balance;
+  }
+
+  p { text-wrap: pretty; }
+
+  input, textarea, select { min-width: 0; }
+
+  /* iOS zooms into any field under 16px — keep forms steady on phones */
+  @media (max-width: 767px) {
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+    select,
+    textarea { font-size: 16px !important; }
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 3px;
+    border-radius: 12px;
+  }
+
+  ::selection { background: var(--primary); color: #fff; }
+}
+
+/* ---------- Utilities used across every page ---------- */
+/* Layered so Tailwind variants (md:shadow-none etc.) can still override them */
+@layer utilities {
+.bg-gradient-primary {
+  background: linear-gradient(160deg, #EE1A8C 0%, #E5007D 45%, #B4005E 100%);
+}
+.bg-gradient-primary:hover { filter: brightness(1.06); }
+
+.bg-gradient-blush { background: linear-gradient(170deg, #FFF0F7 0%, #FFFFFF 75%); }
+
+.bg-gradient-plum {
+  background:
+    radial-gradient(90% 70% at 85% 0%, rgba(229, 0, 125, 0.28) 0%, transparent 60%),
+    radial-gradient(120% 90% at 0% 100%, #4A1538 0%, transparent 55%),
+    #2A0B1F;
+}
+
+.shadow-soft { box-shadow: var(--shadow-soft); }
+.shadow-card { box-shadow: var(--shadow-card); }
+.shadow-glow { box-shadow: var(--shadow-glow); }
+.shadow-icon { filter: drop-shadow(var(--shadow-icon)); }
+
+.app-card {
+  background-color: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 1.5rem;
+  box-shadow: var(--shadow-soft);
+}
+
+.app-input {
+  background-color: #ffffff;
+  border: 1px solid var(--border);
+  color: var(--foreground);
+  transition: border-color .2s, box-shadow .2s;
+}
+.app-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(229, 0, 125, 0.12);
+  outline: none;
+}
+
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+.pb-safe-nav { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+@media (min-width: 768px) { .pb-safe-nav { padding-bottom: 0; } }
+
+}
+
+/* Ribbon + seal for the mystery card */
+@keyframes gn-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.035); } }
+@keyframes gn-sheen { from { transform: translateX(-120%) skewX(-18deg); } to { transform: translateX(220%) skewX(-18deg); } }
+.gn-breathe { animation: gn-breathe 3.6s var(--ease-out-soft) infinite; }
+.gn-sheen::after {
+  content: ""; position: absolute; inset: 0; width: 40%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.18), transparent);
+  animation: gn-sheen 4.5s ease-in-out 1.2s infinite;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Clean scrollbar on desktop */
+@media (pointer: fine) {
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #EADDE5; border-radius: 9999px; border: 2px solid #fff; }
+  ::-webkit-scrollbar-thumb:hover { background: #D7BFCD; }
+}
+
+/* ------------------------------------------------------------------
+   Mystery reveal — the dissolve. Shared 1:1 by website and app.
+   The name comes out of a warm blur while the last frame of the
+   sender's message softens behind it.
+------------------------------------------------------------------- */
+@property --gn-reveal {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 0%;
+}
+@keyframes gn-dissolve {
+  0%   { opacity: 0;   filter: blur(30px) brightness(1.7) saturate(1.5); transform: scale(1.12); --gn-reveal: 0%; }
+  30%  { opacity: .8;  filter: blur(16px) brightness(1.4) saturate(1.3); }
+  70%  { opacity: 1;   filter: blur(3px)  brightness(1.08) saturate(1.05); }
+  100% { opacity: 1;   filter: blur(0)    brightness(1) saturate(1); transform: scale(1); --gn-reveal: 100%; }
+}
+@keyframes gn-frame-soften {
+  from { filter: blur(0) brightness(.9) saturate(1); transform: scale(1); }
+  to   { filter: blur(26px) brightness(.42) saturate(1.2); transform: scale(1.08); }
+}
+@keyframes gn-bloom {
+  0%   { opacity: 0;   transform: scale(.25); }
+  35%  { opacity: .95; }
+  100% { opacity: 0;   transform: scale(1.7); }
+}
+@keyframes gn-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.gn-dissolve {
+  animation: gn-dissolve var(--gn-dissolve-ms, 1800ms) cubic-bezier(.22, .8, .16, 1) both;
+  -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 var(--gn-reveal), transparent calc(var(--gn-reveal) + 45%));
+          mask-image: radial-gradient(circle at 50% 50%, #000 var(--gn-reveal), transparent calc(var(--gn-reveal) + 45%));
+  will-change: filter, transform, opacity;
+}
+.gn-frame-soften { animation: gn-frame-soften var(--gn-dissolve-ms, 1800ms) cubic-bezier(.4, 0, .2, 1) both; }
+.gn-bloom {
+  background: radial-gradient(closest-side, rgba(255, 196, 225, .85), rgba(229, 0, 125, .35) 45%, transparent 72%);
+  animation: gn-bloom 2200ms cubic-bezier(.22, .8, .16, 1) both;
+}
+.gn-rise { animation: gn-rise 520ms cubic-bezier(.16, 1, .3, 1) both; }
+
+/* Suspense countdown */
+@keyframes gn-drain { to { stroke-dashoffset: calc(var(--gn-c) * 1px); } }
+@keyframes gn-count {
+  0%   { opacity: 0; transform: scale(1.6); filter: blur(8px); }
+  22%  { opacity: 1; transform: scale(1);   filter: blur(0); }
+  82%  { opacity: 1; transform: scale(.97); }
+  100% { opacity: 0; transform: scale(.82); filter: blur(2px); }
+}
+.gn-countdown-ring { stroke-dashoffset: 0; animation: gn-drain var(--gn-cd-ms, 5000ms) linear forwards; }
+.gn-count { display: inline-block; animation: gn-count 1000ms cubic-bezier(.16, 1, .3, 1) both; }
+
+/* Staff console (dark) — classes the admin pages use */
+.glass-panel-elevated { background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); }
+.glass-input { background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); color: #fff; }
+.glass-input::placeholder { color: rgba(255, 255, 255, 0.4); }
+.bg-gradient-button { background: linear-gradient(160deg, #EE1A8C 0%, #E5007D 45%, #B4005E 100%); }
