@@ -4,7 +4,7 @@
  * Pages and anything with money or personal data always come from the server,
  * so the app and the website show exactly the same data.
  */
-const VERSION = 'giftnify-v1';
+const VERSION = 'giftnify-v2';
 const STATIC = /^\/(build|images|icons|sounds)\//;
 
 self.addEventListener('install', () => self.skipWaiting());

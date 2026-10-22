@@ -5,7 +5,11 @@ import { AppShell, Avatar, Btn } from "@/components/giftnify/ui";
 import { useContacts } from "@/lib/contacts";
 import { useContent } from "@/lib/content";
 import { Icon3D } from "@/components/giftnify/Icon3D";
-import { MysteryCard } from "@/components/giftnify/MysteryCard";
+import { RevealStage } from "@/components/giftnify/stage/RevealStage";
+import { MomentsGallery } from "@/components/giftnify/stage/MomentsGallery";
+
+/** Same artwork as the website, from the app's bundled icons. */
+const art = (name: string, size: number) => <Icon3D name={name === "gift-open" ? "giftOpen" : name} size={size} eager />;
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -24,9 +28,9 @@ export const Route = createFileRoute("/")({
 const SAMPLE_TOKEN = "demo-x7Kp2qLm9Vt4";
 
 const STEPS = [
-  { title: "Record your message", body: "Film a short video, record a voice note or write a letter. Gift Ideas can help you find the words." },
-  { title: "Add cash or a gift", body: "Choose an amount in your currency, or pick perfume, flowers, a spa day and more from the catalogue." },
-  { title: "We deliver the mystery", body: "They get a sealed link by WhatsApp, SMS, email or a link you share. Your name and the gift appear only after your message plays." },
+  { art: "video", title: "Record your message", body: "Film a short video, record a voice note or write a letter. Gift Ideas can help you find the words." },
+  { art: "money", title: "Add cash or a gift", body: "Choose an amount in your currency, or pick perfume, flowers, a spa day and more from the catalogue." },
+  { art: "gift", title: "We deliver the mystery", body: "They get a sealed link by WhatsApp, SMS, email or a link you share. Your name and the gift appear only after your message plays." },
 ];
 
 function Home() {
@@ -87,7 +91,11 @@ function Home() {
           </ul>
         </div>
 
-        <MysteryCard sampleToken={SAMPLE_TOKEN} />
+        <RevealStage
+          icon={art}
+          sampleHref={`/gift/${SAMPLE_TOKEN}`}
+          renderLink={(href, className, children) => <Link to={href as "/"} className={className}>{children}</Link>}
+        />
       </section>
 
       {/* ---------------- Start with ---------------- */}
@@ -176,6 +184,21 @@ function Home() {
         </div>
       </section>
 
+      {/* ---------------- Moments ---------------- */}
+      <section aria-labelledby="moments-title" className="py-8 md:py-12">
+        <h2 id="moments-title" className="font-display text-2xl font-extrabold md:text-3xl">Gifts people remember</h2>
+        <p className="mt-1 max-w-xl text-sm text-muted-foreground">The message is the gift. What's inside is the surprise.</p>
+        <div className="mt-5">
+          <MomentsGallery
+            icon={art}
+            hrefFor={(occ) => `/create?occasion=${encodeURIComponent(occ)}`}
+            renderLink={(href, className, children, label) => (
+              <Link to="/create" search={{ occasion: new URLSearchParams(href.split("?")[1]).get("occasion") ?? undefined }} className={className} aria-label={label}>{children}</Link>
+            )}
+          />
+        </div>
+      </section>
+
       {/* ---------------- How it works ---------------- */}
       <section aria-labelledby="how-title" className="py-10 md:py-16">
         <div className="grid gap-8 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:gap-16">
@@ -189,8 +212,11 @@ function Home() {
           <ol className="relative space-y-7 border-l-2 border-dashed border-border pl-8 md:space-y-9">
             {STEPS.map((s, i) => (
               <li key={s.title} className="relative">
-                <span className="absolute -left-[3.05rem] top-0 grid size-9 place-items-center rounded-full bg-card font-display text-sm font-extrabold text-primary-deep ring-2 ring-border">{i + 1}</span>
-                <h3 className="font-display text-xl font-extrabold">{s.title}</h3>
+                <span className="absolute -left-[3.05rem] top-1 grid size-9 place-items-center rounded-full bg-card font-display text-sm font-extrabold text-primary-deep ring-2 ring-border">{i + 1}</span>
+                <h3 className="flex items-center gap-3 font-display text-xl font-extrabold">
+                  <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-blush">{art(s.art, 30)}</span>
+                  {s.title}
+                </h3>
                 <p className="mt-1.5 max-w-[60ch] leading-relaxed text-muted-foreground">{s.body}</p>
               </li>
             ))}

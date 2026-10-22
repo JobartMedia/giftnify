@@ -15,6 +15,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware) {
         // Correct client IPs (rate limits) and https detection behind a proxy/CDN.
         $middleware->trustProxies(at: '*');
+        $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
 
         $middleware->web(append: [
             HandleInertiaRequests::class,

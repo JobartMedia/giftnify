@@ -2,19 +2,27 @@ import React, { useEffect, useState } from 'react';
 import { Head, Link, usePage } from '@inertiajs/react';
 import { AppLayout } from '../Layouts/AppLayout';
 import { Icon3D } from '../Components/Icon3D';
-import { MysteryCard } from '../Components/MysteryCard';
+import { RevealStage } from '../Components/stage/RevealStage';
+import { MomentsGallery } from '../Components/stage/MomentsGallery';
+
+const art = (name: string, size: number) => (
+  <img src={`/images/icons/${name}.webp`} alt="" width={size} height={size} draggable={false} style={{ width: size, height: size, objectFit: 'contain' }} />
+);
 import { ArrowRight, ArrowUpRight, Play, Video, Send, KeyRound } from 'lucide-react';
 
 const STEPS = [
   {
+    art: 'video',
     title: 'Record your message',
     body: 'Film a short video, record a voice note or write a letter. Giftgenie A.i can help you find the words.',
   },
   {
+    art: 'money',
     title: 'Add cash or a gift',
     body: 'Choose an amount in your currency, or pick perfume, flowers, a spa day and more from the catalogue.',
   },
   {
+    art: 'gift',
     title: 'We deliver the mystery',
     body: 'They get a sealed link by WhatsApp, SMS, email or a link you share. Your name and the gift appear only after your message plays.',
   },
@@ -88,7 +96,11 @@ export default function Home({ sample_token }: { stats?: any; sample_token: stri
           </ul>
         </div>
 
-        <MysteryCard sampleHref={sampleHref} />
+        <RevealStage
+          icon={art}
+          sampleHref={sampleHref}
+          renderLink={(href, className, children) => <Link href={href} className={className}>{children}</Link>}
+        />
       </section>
 
       {/* ---------------- Start with ---------------- */}
@@ -103,7 +115,7 @@ export default function Home({ sample_token }: { stats?: any; sample_token: stri
             href="/create?type=money"
             className="group relative flex items-center gap-4 overflow-hidden rounded-[1.75rem] border border-line bg-gradient-blush p-4 transition hover:border-magenta/30 md:min-h-[300px] md:flex-col md:items-start md:justify-between md:p-8"
           >
-            <span className="grid size-16 shrink-0 place-items-center rounded-2xl bg-white shadow-soft md:order-2 md:size-auto md:self-end md:bg-transparent md:shadow-none">
+            <span className="grid size-16 shrink-0 place-items-center rounded-2xl max-md:bg-white max-md:shadow-soft md:order-2 md:size-auto md:self-end">
               <Icon3D name="money" size="xl" className="!size-12 md:!size-40" />
             </span>
             <span className="min-w-0 flex-1 md:order-1 md:flex-none">
@@ -171,6 +183,21 @@ export default function Home({ sample_token }: { stats?: any; sample_token: stri
         </section>
       )}
 
+      {/* ---------------- Moments ---------------- */}
+      <section aria-labelledby="moments-title" className="py-8 md:py-12">
+        <h2 id="moments-title" className="font-display text-2xl font-extrabold text-ink md:text-3xl">
+          Gifts people remember
+        </h2>
+        <p className="mt-1 max-w-xl text-sm text-ink-soft">The message is the gift. What's inside is the surprise.</p>
+        <div className="mt-5">
+          <MomentsGallery
+            icon={art}
+            hrefFor={(occ) => `/create?occasion=${encodeURIComponent(occ)}`}
+            renderLink={(href, className, children, label) => <Link href={href} className={className} aria-label={label}>{children}</Link>}
+          />
+        </div>
+      </section>
+
       {/* ---------------- How it works (a real sequence) ---------------- */}
       <section aria-labelledby="how-title" className="py-10 md:py-16">
         <div className="grid gap-8 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:gap-16">
@@ -187,10 +214,13 @@ export default function Home({ sample_token }: { stats?: any; sample_token: stri
           <ol className="relative space-y-7 border-l-2 border-dashed border-line pl-8 md:space-y-9">
             {STEPS.map((s, i) => (
               <li key={s.title} className="relative">
-                <span className="absolute -left-[3.05rem] top-0 grid size-9 place-items-center rounded-full bg-white font-display text-sm font-extrabold text-magenta-deep ring-2 ring-line">
+                <span className="absolute -left-[3.05rem] top-1 grid size-9 place-items-center rounded-full bg-white font-display text-sm font-extrabold text-magenta-deep ring-2 ring-line">
                   {i + 1}
                 </span>
-                <h3 className="font-display text-xl font-extrabold text-ink">{s.title}</h3>
+                <h3 className="flex items-center gap-3 font-display text-xl font-extrabold text-ink">
+                  <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-petal">{art(s.art, 30)}</span>
+                  {s.title}
+                </h3>
                 <p className="mt-1.5 max-w-[60ch] leading-relaxed text-ink-soft">{s.body}</p>
               </li>
             ))}
