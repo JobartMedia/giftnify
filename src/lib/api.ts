@@ -5,7 +5,12 @@
  * Point it at the website with VITE_API_URL (default http://localhost:8000).
  */
 
-export const API_URL = String(import.meta.env["VITE_API_URL"] ?? "http://localhost:8000").replace(/\/+$/, "");
+/**
+ * The phone app can be pointed at a different website without rebuilding:
+ * edit config.js next to index.html (window.GIFTNIFY_API_URL).
+ */
+const runtimeApiUrl = typeof window !== "undefined" ? (window as unknown as { GIFTNIFY_API_URL?: string }).GIFTNIFY_API_URL : undefined;
+export const API_URL = String(runtimeApiUrl || import.meta.env["VITE_API_URL"] || "http://localhost:8000").replace(/\/+$/, "");
 
 const TOKEN_KEY = "giftnify.token";
 const TICKET_KEY = "giftnify.gift-tickets";

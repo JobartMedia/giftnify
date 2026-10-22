@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The live app talks to the website over https only.
+  Plain http is allowed just for testing against the website on your own computer:
+  10.0.2.2 is your computer as seen from the Android emulator.
+  To test on a real phone over Wi-Fi, add your computer's IP address below
+  (for example 192.168.1.20) — and remove these test entries before publishing.
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">10.0.2.2</domain>
+        <domain includeSubdomains="false">localhost</domain>
+    </domain-config>
+</network-security-config>

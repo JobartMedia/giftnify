@@ -111,6 +111,8 @@ function RootShell({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <head>
+        {/* Optional runtime settings for the phone app (which website to talk to). Must load before the app. */}
+        <script src="/config.js" />
         <HeadContent />
       </head>
       <body>

@@ -39,7 +39,7 @@ return [
     'email_delivery' => !in_array(env('MAIL_MAILER', 'log'), ['log', 'array'], true),
 
     // Front ends allowed to use the API and receive payment redirects (the app). Comma-separated origins.
-    'app_clients' => array_values(array_filter(array_map('trim', explode(',', env('APP_CLIENT_URLS', 'http://localhost:3000,http://127.0.0.1:3000'))))),
+    'app_clients' => array_values(array_unique(array_merge(array_filter(array_map('trim', explode(',', env('APP_CLIENT_URLS', 'http://localhost:3000,http://127.0.0.1:3000')))), ['https://localhost', 'capacitor://localhost']))),
 
     'ai' => [
         'key' => env('OPENAI_API_KEY') ?: env('LOVABLE_API_KEY'),
