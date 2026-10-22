@@ -12,7 +12,9 @@ interface Props {
 }
 
 export const AdminLayout: React.FC<Props> = ({ children, title }) => {
-  const { auth, url } = usePage().props as any;
+  const page = usePage();
+  const { auth } = page.props as any;
+  const url = (page.url || '').split('?')[0];
   const user = auth?.user;
 
   const NAV_ITEMS = [
