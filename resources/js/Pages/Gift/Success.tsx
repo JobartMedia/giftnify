@@ -13,7 +13,7 @@ function mask(contact?: string | null) {
   return `••••${contact.slice(-4)}`;
 }
 
-export default function Success({ gift, share_link }: any) {
+export default function Success({ gift, share_link, test_payment }: any) {
   const [copied, setCopied] = useState(false);
   const sentForYou = gift.delivery !== 'Link' && gift.recipient_contact;
 
@@ -36,6 +36,13 @@ export default function Success({ gift, share_link }: any) {
         <span className="mx-auto grid size-28 place-items-center rounded-full bg-petal">
           <Icon3D name="gift" size="xl" className="!size-20" />
         </span>
+
+        {test_payment && (
+          <p role="note" className="mx-auto max-w-md rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-left text-sm font-semibold text-amber-900">
+            Test payment: no money was charged. {gift.currency} doesn't have a real payment provider set up yet, so it was marked paid for testing.
+            Naira gifts go through Paystack. Staff can switch test payments off in Admin, Payment Settings.
+          </p>
+        )}
 
         <div>
           <h1 className="font-display text-3xl font-extrabold text-ink md:text-4xl">Your gift is sealed</h1>

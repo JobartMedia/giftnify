@@ -223,6 +223,8 @@ class PaymentController extends Controller
         return Inertia::render('Gift/Success', [
             'gift' => $gift->only(['token', 'recipient_name', 'occasion', 'delivery', 'currency', 'amount', 'item', 'status', 'recipient_contact']),
             'share_link' => route('reveal.show', ['token' => $token]),
+            // Paid with a free test payment (no real money): say so clearly.
+            'test_payment' => \App\Models\Payment::where('gift_token', $token)->where('status', 'paid')->latest()->value('provider') === 'demo',
         ]);
     }
 
