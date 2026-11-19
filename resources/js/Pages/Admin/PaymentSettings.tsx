@@ -11,6 +11,7 @@ interface Settings {
   demo_possible: boolean;
   routes: Record<string, string | null>;
   payable: string[];
+  payout_mode: 'manual' | 'approve' | 'auto';
   webhooks: { paystack: string; flutterwave: string };
 }
 
@@ -41,7 +42,7 @@ export default function PaymentSettings({ settings }: { settings: Settings }) {
   const [checking, setChecking] = useState(false);
   const [check, setCheck] = useState<{ ok: boolean; message: string } | null>(null);
 
-  const save = (extra: { clear?: string[]; allow_demo?: boolean } = {}) => {
+  const save = (extra: { clear?: string[]; allow_demo?: boolean; payout_mode?: string } = {}) => {
     setSaving(true);
     router.post('/admin/settings/payments', { keys: values, ...extra }, {
       preserveScroll: true,
@@ -188,6 +189,40 @@ export default function PaymentSettings({ settings }: { settings: Settings }) {
             {check.message}
           </p>
         )}
+
+        {/* Payouts */}
+        <section id="payouts" className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+          <h2 className="font-bold text-white">How wallet withdrawals are paid</h2>
+          <p className="mt-1 text-sm text-white/60">
+            Paystack can send Naira bank withdrawals for you from your Paystack balance. Airtime, data, electricity and gift cards are always paid by hand.
+            You can switch back to paying by hand at any time, and the Paid / Failed buttons always stay available.
+          </p>
+          <div className="mt-4 grid gap-2" role="radiogroup" aria-label="Payout mode">
+            {([
+              ['manual', 'Pay by hand', 'Staff send each withdrawal themselves, then mark it Paid.'],
+              ['approve', 'Paystack, after staff approve', 'Staff click "Send with Paystack" on each Naira bank request. Safest way to start.'],
+              ['auto', 'Paystack, automatically', 'Naira bank requests are sent the moment the customer asks. No staff step.'],
+            ] as const).map(([mode, title, desc]) => {
+              const on = settings.payout_mode === mode;
+              const blocked = mode !== 'manual' && !paystackReady;
+              return (
+                <button key={mode} type="button" role="radio" aria-checked={on} disabled={saving || blocked || on}
+                  onClick={() => save({ payout_mode: mode })}
+                  className={`rounded-xl border px-4 py-3 text-left transition ${on ? 'border-pink-400 bg-pink-500/10' : 'border-white/10 hover:bg-white/5'} disabled:cursor-default ${blocked ? 'opacity-40' : ''}`}>
+                  <span className="flex items-center gap-2 text-sm font-bold text-white">
+                    <span className={`grid size-4 place-items-center rounded-full border ${on ? 'border-pink-400' : 'border-white/30'}`}>{on && <span className="size-2 rounded-full bg-pink-400" />}</span>
+                    {title}
+                  </span>
+                  <span className="mt-1 block pl-6 text-xs text-white/60">{desc}{blocked && ' Add your Paystack secret key first.'}</span>
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-3 rounded-xl bg-white/5 p-3 text-xs text-white/60">
+            Before using Paystack payouts: ask Paystack to enable Transfers on your account, keep enough money in your Paystack balance,
+            and turn off the OTP confirmation for transfers (Paystack → Settings → Preferences). Paystack reports the result on the same webhook address below.
+          </p>
+        </section>
 
         {/* Webhooks */}
         <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">

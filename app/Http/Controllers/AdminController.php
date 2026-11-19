@@ -88,7 +88,12 @@ class AdminController extends Controller
             'clear' => 'array',
             'clear.*' => 'string',
             'allow_demo' => 'nullable|boolean',
+            'payout_mode' => 'nullable|in:manual,approve,auto',
         ]);
+        if (!empty($v['payout_mode'])) {
+            \App\Services\PayoutService::setMode($v['payout_mode']);
+            AuditLog::record('settings.payout_mode', 'payout_mode', ['mode' => $v['payout_mode']]);
+        }
         $errors = \App\Services\PaymentSettings::save($v['keys'] ?? [], $v['clear'] ?? [], array_key_exists('allow_demo', $v) ? (bool)$v['allow_demo'] : null);
         if ($errors) {
             return back()->withErrors(collect($errors)->mapWithKeys(fn ($m, $k) => ["keys.{$k}" => $m])->all());
@@ -178,9 +183,30 @@ class AdminController extends Controller
             'failure_reason' => $w->failure_reason,
             'created_at' => $w->created_at?->toISOString(),
             'processed_at' => $w->processed_at?->toISOString(),
+            'payout_channel' => $w->payout_channel,
+            'sent_with_paystack' => (bool)$w->transfer_reference,
+            'paystack_eligible' => \App\Services\PayoutService::eligible($w),
         ]);
 
-        return Inertia::render('Admin/Withdrawals', ['withdrawals' => $list]);
+        return Inertia::render('Admin/Withdrawals', [
+            'withdrawals' => $list,
+            'payout_mode' => \App\Services\PayoutService::mode(),
+            'paystack_ready' => \App\Services\PayoutService::ready(),
+        ]);
+    }
+
+    public function sendWithdrawal(Request $request, string $id)
+    {
+        abort_unless($request->user()->isFinance(), 403);
+        $r = \App\Services\PayoutService::send(Withdrawal::findOrFail($id), $request->user());
+        return back()->with($r['ok'] ? 'success' : 'error', $r['message']);
+    }
+
+    public function verifyWithdrawal(Request $request, string $id)
+    {
+        abort_unless($request->user()->isFinance(), 403);
+        $r = \App\Services\PayoutService::verify(Withdrawal::findOrFail($id), $request->user());
+        return back()->with($r['ok'] ? 'success' : 'error', $r['message']);
     }
 
     public function updateWithdrawal(Request $request, string $id)

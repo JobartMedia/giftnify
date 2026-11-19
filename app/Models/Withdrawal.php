@@ -12,6 +12,7 @@ class Withdrawal extends Model
     protected $fillable = [
         'user_id', 'wallet_id', 'amount', 'currency', 'method', 'details',
         'status', 'failure_reason', 'processed_by', 'processed_at',
+        'payout_channel', 'transfer_reference', 'transfer_code',
     ];
 
     protected $casts = [

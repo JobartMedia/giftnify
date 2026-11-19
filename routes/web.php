@@ -91,6 +91,8 @@ Route::middleware('auth')->group(function () {
         Route::get('/redemptions', [AdminController::class, 'redemptions'])->name('redemptions');
         Route::get('/withdrawals', [AdminController::class, 'withdrawals'])->name('withdrawals');
         Route::patch('/withdrawals/{id}', [AdminController::class, 'updateWithdrawal'])->name('withdrawals.update');
+        Route::post('/withdrawals/{id}/send', [AdminController::class, 'sendWithdrawal'])->middleware('throttle:30,1')->name('withdrawals.send');
+        Route::post('/withdrawals/{id}/verify', [AdminController::class, 'verifyWithdrawal'])->middleware('throttle:30,1')->name('withdrawals.verify');
         Route::patch('/redemptions/{id}', [AdminController::class, 'updateRedemptionStatus'])->name('redemptions.update');
     });
 });

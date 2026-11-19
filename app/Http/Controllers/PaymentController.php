@@ -245,6 +245,13 @@ class PaymentController extends Controller
             return response('Invalid signature', 401);
         }
 
+        // Paystack also reports payouts (wallet withdrawals) on the same webhook.
+        $event = (string)(json_decode($request->getContent(), true)['event'] ?? '');
+        if ($provider === 'paystack' && str_starts_with($event, 'transfer.')) {
+            \App\Services\PayoutService::fromWebhook($event, (array)(json_decode($request->getContent(), true)['data'] ?? []));
+            return response('ok', 200);
+        }
+
         $this->afterPaid(PaymentService::finalizePayment($reference));
         return response('ok', 200);
     }

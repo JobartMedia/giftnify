@@ -96,6 +96,11 @@ class WalletController extends Controller
 
         $r = WalletService::requestWithdrawal($user, strtoupper($v['currency']), (float)$v['amount'], $v['method'], $details);
 
+        // Automatic payouts (if switched on): Naira bank withdrawals go out through Paystack now.
+        if ($r['result'] === 'ok' && !empty($r['withdrawal'])) {
+            \App\Services\PayoutService::afterRequested($r['withdrawal']);
+        }
+
         return response()->json([
             'result' => $r['result'],
             'minimum' => $r['minimum'] ?? null,

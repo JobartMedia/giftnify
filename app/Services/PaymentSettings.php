@@ -67,6 +67,7 @@ class PaymentSettings
             'demo_possible' => app()->environment() !== 'production',
             'routes' => (array)config('services.payments.routes', []),
             'payable' => PaymentService::payableCurrencies(),
+            'payout_mode' => PayoutService::mode(),
             'webhooks' => [
                 'paystack' => url('/api/public/payments/webhook/paystack'),
                 'flutterwave' => url('/api/public/payments/webhook/flutterwave'),

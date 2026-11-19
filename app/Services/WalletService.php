@@ -117,9 +117,9 @@ class WalletService
     }
 
     /** Staff: mark processing / paid / failed. A failed or cancelled withdrawal is refunded to the wallet once. */
-    public static function updateWithdrawal(Withdrawal $w, string $status, User $staff, ?string $reason = null): Withdrawal
+    public static function updateWithdrawal(Withdrawal $w, string $status, ?User $staff, ?string $reason = null, ?string $channel = null): Withdrawal
     {
-        return DB::transaction(function () use ($w, $status, $staff, $reason) {
+        return DB::transaction(function () use ($w, $status, $staff, $reason, $channel) {
             $w = Withdrawal::whereKey($w->id)->lockForUpdate()->firstOrFail();
             if (in_array($w->status, ['paid', 'failed', 'cancelled'], true)) {
                 return $w; // final states never change
@@ -134,8 +134,9 @@ class WalletService
             $w->update([
                 'status' => $status,
                 'failure_reason' => $reason,
-                'processed_by' => $staff->id,
+                'processed_by' => $staff?->id ?? $w->processed_by, // null = done automatically by Paystack
                 'processed_at' => in_array($status, ['paid', 'failed', 'cancelled'], true) ? now() : null,
+                'payout_channel' => $channel ?? $w->payout_channel ?? 'manual',
             ]);
 
             if (class_exists(AuditLog::class)) {

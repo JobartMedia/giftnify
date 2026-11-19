@@ -1,4 +1,5 @@
-import React, { ReactNode } from 'react';
+import { toast } from 'sonner';
+import React, { ReactNode, useEffect } from 'react';
 import { Link, usePage } from '@inertiajs/react';
 import { 
   Shield, Gift, CreditCard, Tag, Landmark, KeyRound, 
@@ -16,6 +17,14 @@ export const AdminLayout: React.FC<Props> = ({ children, title }) => {
   const { auth } = page.props as any;
   const url = (page.url || '').split('?')[0];
   const user = auth?.user;
+  const flash = (page.props as any).flash ?? {};
+
+  // Server messages (payouts, settings) show as toasts in the staff console too.
+  useEffect(() => {
+    if (flash.error) toast.error(flash.error);
+    if (flash.success) toast.success(flash.success);
+    if (flash.info) toast(flash.info);
+  }, [flash.error, flash.success, flash.info]);
 
   const NAV_ITEMS = [
     { label: 'Overview', href: '/admin', icon: LayoutDashboard },
