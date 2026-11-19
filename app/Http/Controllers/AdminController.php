@@ -71,6 +71,42 @@ class AdminController extends Controller
         ]);
     }
 
+    /* ---------------- Payment settings (admins only) ---------------- */
+
+    public function paymentSettings(Request $request): Response
+    {
+        abort_unless($request->user()->isAdmin(), 403);
+        return Inertia::render('Admin/PaymentSettings', ['settings' => \App\Services\PaymentSettings::status()]);
+    }
+
+    public function savePaymentSettings(Request $request)
+    {
+        abort_unless($request->user()->isAdmin(), 403);
+        $v = $request->validate([
+            'keys' => 'array',
+            'keys.*' => 'nullable|string|max:300',
+            'clear' => 'array',
+            'clear.*' => 'string',
+            'allow_demo' => 'nullable|boolean',
+        ]);
+        $errors = \App\Services\PaymentSettings::save($v['keys'] ?? [], $v['clear'] ?? [], array_key_exists('allow_demo', $v) ? (bool)$v['allow_demo'] : null);
+        if ($errors) {
+            return back()->withErrors(collect($errors)->mapWithKeys(fn ($m, $k) => ["keys.{$k}" => $m])->all());
+        }
+        AuditLog::record('settings.payments_updated', 'payment_keys', [
+            'changed' => array_keys(array_filter($v['keys'] ?? [])),
+            'cleared' => $v['clear'] ?? [],
+        ]);
+        return back()->with('success', 'Payment settings saved.');
+    }
+
+    public function checkPaystack(Request $request)
+    {
+        abort_unless($request->user()->isAdmin(), 403);
+        \App\Services\PaymentSettings::apply();
+        return response()->json(\App\Services\PaymentSettings::checkPaystack());
+    }
+
     public function promos(): Response
     {
         $promos = PromoCode::latest()->get();

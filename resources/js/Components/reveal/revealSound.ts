@@ -1,9 +1,9 @@
 /**
  * The reveal sound.
  *
- * If a designed sound exists at /sounds/reveal.mp3 it is used. Until a sound
- * designer delivers that file, a synthesized "dissolve + cash-out" plays instead:
- * an airy dissolve, a register ka-ching, then a cascade of coins.
+ * Giftnify's own sound, /sounds/reveal.mp3 ("You have been Giftnified"), plays
+ * at the reveal and as the "a gift has landed" chime when a gift page opens.
+ * If that file is missing, a synthesized "dissolve + cash-out" plays instead.
  * The countdown before it plays one tick per second, rising in pitch.
  *
  * Browsers only allow audio after a tap, and the reveal happens after the
@@ -22,10 +22,42 @@ let muted = false;
 
 export function setRevealMuted(value: boolean) {
   muted = value;
+  if (value) stopGiftLanded();
 }
 
 export function isRevealMuted() {
   return muted;
+}
+
+let landed: HTMLAudioElement | null = null;
+
+/**
+ * "A gift has landed" — plays the Giftnify sound as the sealed gift appears.
+ * Phones and browsers may block sound before the first tap; then it stays silent
+ * (the reveal still plays it). The Android app allows it.
+ */
+export function playGiftLanded() {
+  if (muted || typeof Audio === 'undefined') return;
+  try {
+    landed = new Audio(CUSTOM_SOUND_URL);
+    landed.volume = 0.9;
+    void landed.play().catch(() => { landed = null; });
+  } catch {
+    landed = null;
+  }
+}
+
+/** Fades out the "gift landed" sound so it never talks over the message. */
+export function stopGiftLanded() {
+  const a = landed;
+  landed = null;
+  if (!a || a.paused) return;
+  const step = () => {
+    a.volume = Math.max(0, a.volume - 0.15);
+    if (a.volume <= 0.01) { a.pause(); return; }
+    setTimeout(step, 40);
+  };
+  step();
 }
 
 /** Call inside the user's tap that starts the message. Safe to call twice. */

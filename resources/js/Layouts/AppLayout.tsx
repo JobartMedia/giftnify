@@ -9,16 +9,17 @@ interface Props {
   title?: string;
 }
 
+/** The Giftnify logo (gift mark + name). `light` is for dark backgrounds. */
 export function Wordmark({ light = false }: { light?: boolean }) {
   return (
-    <span className="flex items-center gap-2">
-      <span className="grid size-9 place-items-center rounded-[0.9rem] bg-gradient-primary shadow-glow">
-        <Gift className="size-[18px] text-white" strokeWidth={2.4} aria-hidden />
-      </span>
-      <span className={`font-display text-[1.35rem] font-extrabold tracking-tight ${light ? 'text-white' : 'text-ink'}`}>
-        Giftnify
-      </span>
-    </span>
+    <img
+      src={light ? '/images/brand/logo-light.webp' : '/images/brand/logo.webp'}
+      alt="Giftnify"
+      width={120}
+      height={42}
+      className="block h-[38px] w-auto"
+      draggable={false}
+    />
   );
 }
 

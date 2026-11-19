@@ -83,6 +83,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/gifts', [AdminController::class, 'gifts'])->name('gifts');
         Route::patch('/gifts/{id}', [AdminController::class, 'updateGiftStatus'])->name('gifts.update');
         Route::get('/payments', [AdminController::class, 'payments'])->name('payments');
+        Route::get('/settings/payments', [AdminController::class, 'paymentSettings'])->name('settings.payments');
+        Route::post('/settings/payments', [AdminController::class, 'savePaymentSettings'])->name('settings.payments.save');
+        Route::post('/settings/payments/check', [AdminController::class, 'checkPaystack'])->middleware('throttle:10,1')->name('settings.payments.check');
         Route::get('/promos', [AdminController::class, 'promos'])->name('promos');
         Route::post('/promos', [AdminController::class, 'storePromo'])->name('promos.store');
         Route::get('/redemptions', [AdminController::class, 'redemptions'])->name('redemptions');

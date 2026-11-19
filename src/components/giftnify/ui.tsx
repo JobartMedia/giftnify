@@ -1,19 +1,13 @@
+import logoDark from "@/assets/brand/logo.webp";
+import logoLight from "@/assets/brand/logo-light.webp";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { Home, Plus, Gift, Activity, User, ChevronLeft, Sparkles, Bell, Wallet } from "lucide-react";
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
+/** The Giftnify logo (gift mark + name). `light` is for dark backgrounds. */
 export function Logo({ light = false }: { light?: boolean }) {
-  return (
-    <div className="flex items-center gap-2">
-      <div className="grid size-9 place-items-center rounded-[0.9rem] bg-gradient-primary shadow-glow">
-        <Gift className="size-[18px] text-primary-foreground" strokeWidth={2.4} aria-hidden />
-      </div>
-      <span className={cn("font-display text-[1.35rem] font-extrabold tracking-tight", light ? "text-plum-foreground" : "text-foreground")}>
-        Giftnify
-      </span>
-    </div>
-  );
+  return <img src={light ? logoLight : logoDark} alt="Giftnify" width={120} height={42} className="block h-[38px] w-auto" draggable={false} />;
 }
 
 type Variant = "primary" | "outline" | "soft" | "ghost" | "light";

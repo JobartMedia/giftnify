@@ -1,7 +1,7 @@
 import React, { ReactNode } from 'react';
 import { Link, usePage } from '@inertiajs/react';
 import { 
-  Shield, Gift, CreditCard, Tag, Landmark, 
+  Shield, Gift, CreditCard, Tag, Landmark, KeyRound, 
   ArrowLeft, LogOut, LayoutDashboard, Sparkles, Wallet 
 } from 'lucide-react';
 import { Icon3D } from '../Components/Icon3D';
@@ -24,6 +24,7 @@ export const AdminLayout: React.FC<Props> = ({ children, title }) => {
     { label: 'Payout Redemptions', href: '/admin/redemptions', icon: Landmark },
     { label: 'Wallet Withdrawals', href: '/admin/withdrawals', icon: Wallet },
     { label: 'Promo Codes', href: '/admin/promos', icon: Tag },
+    { label: 'Payment Settings', href: '/admin/settings/payments', icon: KeyRound },
   ];
 
   return (
@@ -38,9 +39,7 @@ export const AdminLayout: React.FC<Props> = ({ children, title }) => {
             </Link>
             <div className="h-4 w-px bg-white/10" />
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center">
-                <Shield className="w-4 h-4" />
-              </div>
+              <img src="/images/brand/mark.webp" alt="Giftnify" width={24} height={32} className="h-8 w-auto" />
               <span className="font-extrabold text-sm text-white tracking-tight">Staff Console</span>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-pink-500/10 text-pink-400 border border-pink-500/20">
                 {user?.role?.toUpperCase() || 'STAFF'}

@@ -3,7 +3,7 @@ import {
   Lock, Play, Mic, PenLine, Square, Send, Check, Loader2, ChevronLeft, Volume2, VolumeX,
   Smartphone, Wifi, Zap, Wallet, CreditCard, Landmark, RotateCcw, ShieldCheck,
 } from 'lucide-react';
-import { unlockRevealSound, playRevealSound, playCountdownTick, setRevealMuted, isRevealMuted } from './revealSound';
+import { unlockRevealSound, playRevealSound, playCountdownTick, setRevealMuted, isRevealMuted, playGiftLanded, stopGiftLanded } from './revealSound';
 
 /**
  * Giftnify mystery reveal.
@@ -12,7 +12,7 @@ import { unlockRevealSound, playRevealSound, playCountdownTick, setRevealMuted, 
  *   sealed  → hint + "Play the message"            (tap unlocks sound)
  *   message → video / voice / letter
  *   hold    → REVEAL_PAUSE_MS of total stillness   (never zero)
- *   countdown → 5…1, a tick each second, the suspense
+ *   countdown → 8…1, a tick each second, the suspense
  *   reveal  → name dissolves out of blur + sound + value lands, same frame
  *   actions → Reply first, "Use my gift" second
  *
@@ -26,7 +26,7 @@ import { unlockRevealSound, playRevealSound, playCountdownTick, setRevealMuted, 
 /** Silence and stillness between the message ending and the name appearing. Test 500–1500, never 0. */
 export const REVEAL_PAUSE_MS = 500;
 /** Suspense countdown before the sender appears. */
-export const COUNTDOWN_SECONDS = 5;
+export const COUNTDOWN_SECONDS = 8;
 /** How long the blur takes to clear. Slow on purpose. */
 export const DISSOLVE_MS = 1800;
 /** How long the value takes to count up. Starts on the same frame as the dissolve. */
@@ -139,7 +139,15 @@ export function RevealTheatre({ gift, api, icon, logo, createHref = '/create', w
     return revealPromise.current;
   }, [api]);
 
+  // "A gift has landed": the Giftnify sound plays as the sealed gift appears (once).
+  useEffect(() => {
+    if (!gift.revealed) playGiftLanded();
+    return () => stopGiftLanded();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const start = () => {
+    stopGiftLanded();
     unlockRevealSound();
     api.markOpened();
     setStage('message');
@@ -169,6 +177,7 @@ export function RevealTheatre({ gift, api, icon, logo, createHref = '/create', w
 
   // Returning visitor who already saw the reveal: skip straight to it.
   const skipToGift = async () => {
+    stopGiftLanded();
     unlockRevealSound();
     try {
       setData(await prefetch());

@@ -25,5 +25,8 @@ class AppServiceProvider extends ServiceProvider
             \Illuminate\Support\Facades\URL::forceScheme('https');
         }
         Vite::prefetch(concurrency: 3);
+
+        // Payment keys saved in the staff console override .env.
+        \App\Services\PaymentSettings::apply();
     }
 }
