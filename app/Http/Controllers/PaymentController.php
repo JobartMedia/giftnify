@@ -129,7 +129,8 @@ class PaymentController extends Controller
 
         $quote = $this->quoteFor($gift, $promoCode);
         $promo = $quote['promo_applied'] ? PromoCode::where('code', $quote['promo_code'])->first() : null;
-        $reference = 'gn_' . $gift->token . '_' . base_convert((string)time(), 10, 36);
+        // Paystack accepts only letters, digits, "-", "." and "=" in references.
+        $reference = 'gn-' . $gift->token . '-' . base_convert((string)time(), 10, 36);
 
         DB::transaction(function () use ($reference, $gift, $user, $provider, $quote, $promo) {
             Payment::create([
@@ -177,7 +178,12 @@ class PaymentController extends Controller
         } catch (\Throwable $e) {
             Log::error('Checkout start failed', ['provider' => $provider, 'error' => $e->getMessage()]);
             Payment::where('reference', $reference)->update(['status' => 'failed']);
-            return ['status' => 'error', 'message' => "We couldn't reach the payment provider. Nothing was charged. Try again in a minute."];
+            $message = "We couldn't reach the payment provider. Nothing was charged. Try again in a minute.";
+            // On a test computer (APP_DEBUG=true) show the provider's own reason, to make setup problems obvious.
+            if (config('app.debug')) {
+                $message .= ' Reason: ' . \Illuminate\Support\Str::limit($e->getMessage(), 220);
+            }
+            return ['status' => 'error', 'message' => $message];
         }
 
         if (!empty($checkout['provider_ref'])) {
