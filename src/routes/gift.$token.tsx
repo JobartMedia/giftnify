@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Logo } from "@/components/giftnify/ui";
 import { Icon3D } from "@/components/giftnify/Icon3D";
 import { RevealTheatre, type RevealApi, type RevealGift, type RedeemResult } from "@/components/giftnify/reveal/RevealTheatre";
-import { getGiftByToken, markGiftOpened, revealGift, replyToGift, redeemGift, sendGiftCode, verifyGiftCode, verifyBankAccount } from "@/lib/gifts.functions";
+import { getGiftByToken, markGiftOpened, revealGift, guessSender, replyToGift, redeemGift, sendGiftCode, verifyGiftCode, verifyBankAccount } from "@/lib/gifts.functions";
 import { findGift } from "@/lib/gifts";
 import { claimGiftToWallet } from "@/lib/wallet.functions";
 
@@ -33,7 +33,7 @@ function Recipient() {
 
   useEffect(() => {
     if (demo) {
-      setGift({ token, isDemo: true, recipientName: "You", occasion: demo.occasion, messageType: demo.messageType, messageText: demo.messageText, mediaUrl: demo.mediaUrl, hint: DEMO_HINT, revealed: false, hasReply: false });
+      setGift({ token, isDemo: true, recipientName: "You", occasion: demo.occasion, messageType: demo.messageType, messageText: demo.messageText, mediaUrl: demo.mediaUrl, hint: DEMO_HINT, revealed: false, hasReply: false, revealMode: "classic", guess: null, teaser: null, locked: false, unlockAt: null });
       return;
     }
     getGiftByToken({ data: { token } }).then((g) => {
@@ -63,6 +63,7 @@ function Recipient() {
         if ("error" in r) throw new Error(r.error);
         return { ...r, redeemed: r.wallet?.credited ? true : r.redeemed };
       },
+      guess: (text) => guessSender({ data: { token, guess: text } }),
       claim: async () => claimGiftToWallet({ data: { token } }),
       reply: async ({ text, voice }) => (await replyToGift({ data: { token, ...(text ? { text } : {}), ...(voice ? { voice } : {}) } })).result,
       redeem: async (method, details) => (await redeemGift({ data: { token, method, details } })).result as RedeemResult,

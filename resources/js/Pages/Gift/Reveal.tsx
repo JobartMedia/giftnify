@@ -36,7 +36,15 @@ export default function Reveal({ gift, error, message, banks }: any) {
           signedIn: !!d.signed_in,
           wallet: d.wallet ?? null,
           verify: d.verify ?? null,
+          anonymous: !!d.anonymous,
+          guessResult: d.guess_result ?? null,
         };
+      },
+      guess: async (text: string) => {
+        const res = await post(`/gift/${t}/guess`, { guess: text });
+        const d = await res.json().catch(() => ({}));
+        if (!res.ok || !d.result) return { result: 'error' as const, triesLeft: 0, hints: [] };
+        return { result: d.result, triesLeft: Number(d.tries_left ?? 0), hints: d.hints ?? [], senderName: d.sender_name, senderFirst: d.sender_first };
       },
       reply: async ({ text, voice }) => {
         const form = new FormData();
@@ -106,6 +114,11 @@ export default function Reveal({ gift, error, message, banks }: any) {
     hint: gift.hint,
     revealed: !!gift.revealed,
     hasReply: !!gift.has_reply,
+    revealMode: gift.reveal_mode === 'guess' ? 'guess' : 'classic',
+    guess: gift.guess ? { hints: gift.guess.hints ?? [], triesLeft: Number(gift.guess.tries_left ?? 3), result: gift.guess.result ?? null } : null,
+    teaser: gift.teaser ?? null,
+    locked: !!gift.locked,
+    unlockAt: gift.unlock_at ?? null,
   };
 
   return (

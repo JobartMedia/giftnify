@@ -5,11 +5,24 @@ import { Icon3D } from '../../Components/Icon3D';
 import { 
   ChevronLeft, ArrowRight, MessageSquare, Video, Mic, 
   Sparkles, Check, Gift as GiftIcon, DollarSign, Lock, 
-  Smartphone, Mail, Link as LinkIcon, AlertCircle, Loader2 
+  Smartphone, Mail, Link as LinkIcon, AlertCircle, Loader2,
+  HelpCircle, EyeOff, CalendarClock, Eye
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-export default function Create({ contacts, preselected }: any) {
+/** Next midnight in the sender's own time, as a datetime-local value. */
+function nextMidnightLocal() {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  d.setHours(0, 0, 0, 0);
+  return toLocalInput(d);
+}
+function toLocalInput(d: Date) {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+export default function Create({ contacts, preselected, creator }: any) {
   const { cms, auth } = usePage().props as any;
   const currencies = cms?.currencies || [];
   const occasions = cms?.occasions || [];
@@ -17,12 +30,23 @@ export default function Create({ contacts, preselected }: any) {
   const [step, setStep] = useState(0);
 
   // Form states
-  const [recipientName, setRecipientName] = useState(preselected?.to || '');
+  const [recipientName, setRecipientName] = useState(creator ? creator.name : (preselected?.to || ''));
   // Only channels that can really deliver right now (set up on the server)
   const channels: string[] = cms?.delivery_channels?.length ? cms.delivery_channels : ['Link'];
   const [delivery, setDelivery] = useState(channels[0]);
   const [contact, setContact] = useState('');
-  const [occasion, setOccasion] = useState(preselected?.occasion || 'Birthday');
+  const [occasion, setOccasion] = useState(preselected?.occasion || (creator ? 'Just Because' : 'Birthday'));
+
+  // How the mystery plays out
+  const [revealMode, setRevealMode] = useState<'classic' | 'guess' | 'anonymous'>(preselected?.mode || (creator ? 'classic' : 'guess'));
+  const [guessHints, setGuessHints] = useState<string[]>(['', '', '']);
+  const [guessNames, setGuessNames] = useState('');
+  const [valueTeaser, setValueTeaser] = useState<'mystery' | 'figures'>('mystery');
+  const [schedule, setSchedule] = useState<'now' | 'later'>('now');
+  const [unlockLocal, setUnlockLocal] = useState(nextMidnightLocal());
+  // Creator link extras
+  const [wallNote, setWallNote] = useState('');
+  const [onWall, setOnWall] = useState(true);
   
   // Message state
   const [messageType, setMessageType] = useState<'text' | 'audio' | 'video'>('text');
@@ -34,9 +58,11 @@ export default function Create({ contacts, preselected }: any) {
   const [giftMode, setGiftMode] = useState<'money' | 'item'>(preselected?.item ? 'item' : 'money');
   const preferred = auth?.user?.preferred_currency;
   const [currency, setCurrency] = useState(
-    currencies.some((c: any) => c.code === preferred) ? preferred : (currencies[0]?.code ?? 'NGN')
+    creator && currencies.some((c: any) => c.code === creator.currency) ? creator.currency
+      : currencies.some((c: any) => c.code === preferred) ? preferred : (currencies[0]?.code ?? 'NGN')
   );
   const [amount, setAmount] = useState<number>(() => {
+    if (preselected?.amount) return Number(preselected.amount);
     const perUsd = Number(currencies.find((c: any) => c.code === currency)?.per_usd ?? 1);
     if (preselected?.price_usd) return Math.max(1, Math.round(preselected.price_usd * perUsd));
     return currency === 'NGN' ? 10000 : 50;
@@ -124,7 +150,7 @@ export default function Create({ contacts, preselected }: any) {
   const total = amount + fee;
 
   const validateCurrentStep = () => {
-    if (step === 0) {
+    if (step === 0 && !creator) {
       if (!recipientName.trim() || recipientName.length < 2) {
         toast.error("Please enter the recipient's name.");
         return false;
@@ -229,6 +255,13 @@ export default function Create({ contacts, preselected }: any) {
 
   const handleSubmit = async () => {
     if (isSubmitting) return;
+    if (schedule === 'later') {
+      const t = new Date(unlockLocal).getTime();
+      if (!unlockLocal || Number.isNaN(t) || t < Date.now() + 60_000) {
+        toast.error('Pick an opening time at least a minute from now.');
+        return;
+      }
+    }
     setIsSubmitting(true);
 
     try {
@@ -244,6 +277,19 @@ export default function Create({ contacts, preselected }: any) {
       if (relationship) formData.append('relationship', relationship);
       if (hint.trim()) formData.append('sender_hint', hint.trim());
       if (giftMode === 'item' && selectedItem) formData.append('item', selectedItem);
+      formData.append('reveal_mode', revealMode);
+      if (revealMode === 'guess') {
+        const hints = guessHints.map((h, i) => (i === 0 ? (h.trim() || hint.trim()) : h.trim()));
+        hints.forEach((h) => formData.append('guess_hints[]', h));
+        if (guessNames.trim()) formData.append('guess_names', guessNames.trim());
+      }
+      formData.append('value_teaser', valueTeaser);
+      if (schedule === 'later') formData.append('unlock_at', new Date(unlockLocal).toISOString());
+      if (creator) {
+        formData.append('creator', creator.username);
+        if (wallNote.trim()) formData.append('wall_note', wallNote.trim());
+        formData.append('on_wall', onWall ? '1' : '0');
+      }
       if (recordedBlob) {
         formData.append('media', recordedBlob, `greeting.webm`);
       }
@@ -322,8 +368,42 @@ export default function Create({ contacts, preselected }: any) {
           </span>
         </div>
 
+        {/* STEP 0 (creator link): who it's for is already decided */}
+        {step === 0 && creator && (
+          <div className="p-7 sm:p-9 rounded-3xl bg-white border border-[#EADDE5] shadow-soft space-y-6">
+            <div className="flex items-center gap-4">
+              {creator.avatar_url
+                ? <img src={creator.avatar_url} alt="" className="size-16 rounded-full object-cover ring-4 ring-[#FFF0F7]" />
+                : <span className="grid size-16 place-items-center rounded-full bg-gradient-primary font-display text-2xl font-extrabold text-white">{creator.name.slice(0, 1)}</span>}
+              <div>
+                <h2 className="text-2xl font-black tracking-tight text-[#251522]">Giftnify {creator.name}</h2>
+                <p className="text-sm text-[#7B6674]">@{creator.username}. Your gift lands in their Giftnify wallet when they open it.</p>
+              </div>
+            </div>
+            <div>
+              <label htmlFor="occasion-creator" className="block text-xs font-bold text-[#7B6674] mb-2">What's it for?</label>
+              <select id="occasion-creator" value={occasion} onChange={(e) => setOccasion(e.target.value)}
+                className="w-full px-4 py-3.5 rounded-2xl border border-[#EADDE5] bg-white text-sm font-semibold text-[#251522] focus:border-[#E5007D] outline-none">
+                {['Just Because', 'Birthday', 'New Job', 'Congratulations', 'Thank You', 'Wedding', 'Graduation'].map((o) => <option key={o}>{o}</option>)}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="wall-note" className="block text-xs font-bold text-[#7B6674] mb-2">A short public note (optional)</label>
+              <input id="wall-note" maxLength={140} value={wallNote} onChange={(e) => setWallNote(e.target.value)} placeholder="e.g. Happy birthday! Keep creating"
+                className="w-full px-4 py-3.5 rounded-2xl border border-[#EADDE5] bg-white text-sm text-[#251522] placeholder:text-[#A898A3] focus:border-[#E5007D] outline-none" />
+              <label className="mt-3 flex items-center gap-2.5 text-sm font-semibold text-[#251522]">
+                <input type="checkbox" checked={onWall} onChange={(e) => setOnWall(e.target.checked)} className="size-4 accent-[#E5007D]" />
+                Show my note on {creator.name.split(' ')[0]}'s page (the amount is never shown)
+              </label>
+            </div>
+            <button type="button" onClick={handleNext} className="w-full py-4 rounded-2xl font-bold bg-gradient-primary text-white shadow-glow flex items-center justify-center gap-2">
+              Next: your message <ArrowRight className="w-5 h-5" />
+            </button>
+          </div>
+        )}
+
         {/* STEP 0: RECIPIENT */}
-        {step === 0 && (
+        {step === 0 && !creator && (
           <div className="p-7 sm:p-9 rounded-3xl bg-white border border-[#EADDE5] shadow-soft space-y-6">
             <div className="space-y-1">
               <h2 className="text-2xl font-black tracking-tight text-[#251522]">Who is this gift for?</h2>
@@ -673,7 +753,7 @@ export default function Create({ contacts, preselected }: any) {
                   </div>
                   <div>
                     <h4 className="text-sm font-bold text-[#251522]">{occasion} Mystery Gift</h4>
-                    <p className="text-xs text-[#7B6674]">For {recipientName} via {delivery}</p>
+                    <p className="text-xs text-[#7B6674]">{creator ? `For @${creator.username}'s gift link` : `For ${recipientName} via ${delivery}`}</p>
                   </div>
                 </div>
                 <span className="text-xl font-black text-[#E5007D]">
@@ -686,8 +766,83 @@ export default function Create({ contacts, preselected }: any) {
               </div>
             </div>
 
-            {/* Mystery hint */}
+            {/* How the mystery plays out */}
             <div className="space-y-3 rounded-2xl border border-[#EADDE5] p-5">
+              <div>
+                <h3 className="text-base font-extrabold text-[#251522]">How should the reveal play out?</h3>
+                <p className="text-xs text-[#7B6674]">Your name and the gift stay hidden until the end either way.</p>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-3" role="radiogroup" aria-label="Reveal style">
+                {([
+                  ['guess', HelpCircle, 'Guess who', 'They get 3 tries, with a new hint each time. They can skip.'],
+                  ['classic', Eye, 'Reveal after the message', 'A hint, your message, then your name.'],
+                  ['anonymous', EyeOff, 'Stay anonymous', 'They never find out it was you.'],
+                ] as const).map(([m, Ico, title, desc]) => (
+                  <button key={m} type="button" role="radio" aria-checked={revealMode === m} onClick={() => setRevealMode(m)}
+                    className={`rounded-2xl border p-3.5 text-left transition ${revealMode === m ? 'border-[#E5007D] bg-[#FFF0F7] ring-4 ring-[#E5007D]/10' : 'border-[#EADDE5] bg-white hover:border-[#E5007D]/40'}`}>
+                    <Ico className={`size-5 ${revealMode === m ? 'text-[#E5007D]' : 'text-[#7B6674]'}`} aria-hidden />
+                    <span className="mt-2 block text-sm font-extrabold text-[#251522]">{title}</span>
+                    <span className="mt-0.5 block text-[11px] leading-snug text-[#7B6674]">{desc}</span>
+                  </button>
+                ))}
+              </div>
+
+              {revealMode === 'guess' && (
+                <div className="space-y-2.5 pt-1">
+                  {guessHints.map((h, i) => (
+                    <div key={i}>
+                      <label htmlFor={`guess-hint-${i}`} className="block text-xs font-bold text-[#7B6674] mb-1">
+                        Hint {i + 1} {i === 0 ? '(shown first)' : `(after ${i} wrong ${i === 1 ? 'guess' : 'guesses'})`}
+                      </label>
+                      <input id={`guess-hint-${i}`} maxLength={120} value={i === 0 && !h ? hint : h}
+                        onChange={(e) => setGuessHints((arr) => arr.map((x, j) => (j === i ? e.target.value : x)))}
+                        placeholder={['We met in school', 'I have dreads', 'I called you last week'][i]}
+                        className="w-full rounded-xl border border-[#EADDE5] bg-[#FFF8FB] px-3.5 py-2.5 text-sm font-semibold text-[#251522] outline-none focus:border-[#E5007D]" />
+                    </div>
+                  ))}
+                  <div>
+                    <label htmlFor="guess-names" className="block text-xs font-bold text-[#7B6674] mb-1">Other names they might call you (optional)</label>
+                    <input id="guess-names" maxLength={120} value={guessNames} onChange={(e) => setGuessNames(e.target.value)}
+                      placeholder="e.g. Bayo, Big Sis, Mummy T"
+                      className="w-full rounded-xl border border-[#EADDE5] bg-[#FFF8FB] px-3.5 py-2.5 text-sm font-semibold text-[#251522] outline-none focus:border-[#E5007D]" />
+                    <p className="mt-1 text-[11px] text-[#7B6674]">Your account name always counts as a right answer. Don't put your name in a hint.</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Value teaser + schedule */}
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-2 rounded-2xl border border-[#EADDE5] p-5">
+                <h3 className="text-sm font-extrabold text-[#251522]">What they know about the value</h3>
+                {([['mystery', 'Total mystery', 'Nothing until the reveal.'], ['figures', 'Tease how big', `"It's a ${String(Math.floor(amount)).length}-figure ${currentCurrency.symbol} gift"`]] as const).map(([v, t, d]) => (
+                  <label key={v} className={`flex cursor-pointer gap-2.5 rounded-xl border p-3 ${valueTeaser === v ? 'border-[#E5007D] bg-[#FFF0F7]' : 'border-[#EADDE5]'}`}>
+                    <input type="radio" name="teaser" checked={valueTeaser === v} onChange={() => setValueTeaser(v)} className="mt-0.5 accent-[#E5007D]" />
+                    <span><span className="block text-sm font-bold text-[#251522]">{t}</span><span className="block text-[11px] text-[#7B6674]">{d}</span></span>
+                  </label>
+                ))}
+              </div>
+              <div className="space-y-2 rounded-2xl border border-[#EADDE5] p-5">
+                <h3 className="flex items-center gap-1.5 text-sm font-extrabold text-[#251522]"><CalendarClock className="size-4 text-[#E5007D]" aria-hidden /> When it opens</h3>
+                {([['now', 'As soon as it\'s paid'], ['later', 'At a set time (e.g. midnight on their birthday)']] as const).map(([v, t]) => (
+                  <label key={v} className={`flex cursor-pointer gap-2.5 rounded-xl border p-3 ${schedule === v ? 'border-[#E5007D] bg-[#FFF0F7]' : 'border-[#EADDE5]'}`}>
+                    <input type="radio" name="schedule" checked={schedule === v} onChange={() => setSchedule(v)} className="mt-0.5 accent-[#E5007D]" />
+                    <span className="text-sm font-bold text-[#251522]">{t}</span>
+                  </label>
+                ))}
+                {schedule === 'later' && (
+                  <div className="space-y-1.5">
+                    <label htmlFor="unlock-at" className="sr-only">Opening time</label>
+                    <input id="unlock-at" type="datetime-local" value={unlockLocal} min={toLocalInput(new Date(Date.now() + 5 * 60_000))} onChange={(e) => setUnlockLocal(e.target.value)}
+                      className="w-full rounded-xl border border-[#EADDE5] bg-white px-3 py-2.5 text-sm font-semibold text-[#251522] outline-none focus:border-[#E5007D]" />
+                    <p className="text-[11px] text-[#7B6674]">They get a "something is coming" message now, and a countdown until it opens. Your time zone.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Mystery hint */}
+            {revealMode !== 'guess' && <div className="space-y-3 rounded-2xl border border-[#EADDE5] p-5">
               <div>
                 <h3 className="text-base font-extrabold text-[#251522]">The hint they'll see first</h3>
                 <p className="text-xs text-[#7B6674]">It should make them curious without giving you away. Pick how they know you and we'll write one, or type your own.</p>
@@ -721,7 +876,7 @@ export default function Create({ contacts, preselected }: any) {
                   {hintLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />} Write another
                 </button>
               </div>
-            </div>
+            </div>}
 
             {/* Price Breakdown */}
             <div className="space-y-2.5 pt-2 text-sm border-t border-[#EADDE5]">

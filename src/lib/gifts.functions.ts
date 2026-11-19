@@ -17,6 +17,11 @@ export interface SealedGift {
   hint: string | null;
   revealed: boolean;
   hasReply: boolean;
+  revealMode: "classic" | "guess";
+  guess: { hints: string[]; triesLeft: number; result: "correct" | "out" | "skipped" | null } | null;
+  teaser: string | null;
+  locked: boolean;
+  unlockAt: string | null;
 }
 
 export interface RevealedGift {
@@ -29,6 +34,8 @@ export interface RevealedGift {
   signedIn: boolean;
   wallet: { credited: boolean; balance: number; currency: string } | null;
   verify: { required: boolean; channel: "email" | "phone" | null; destination: string | null } | null;
+  anonymous: boolean;
+  guessResult: "correct" | "out" | "skipped" | null;
 }
 
 type In = { data: { token: string } };
@@ -38,6 +45,8 @@ interface SealedResponse {
   gift?: {
     token: string; recipient_name: string; occasion: string; message_type: Gift["messageType"];
     message_text: string | null; media_url: string | null; hint: string | null; revealed: boolean; has_reply: boolean;
+    reveal_mode?: string; guess?: { hints?: string[]; tries_left?: number; result?: "correct" | "out" | "skipped" | null } | null;
+    teaser?: string | null; locked?: boolean; unlock_at?: string | null;
   };
   banks?: string[];
 }
@@ -52,6 +61,9 @@ export async function getGiftByToken({ data }: In): Promise<(SealedGift & { bank
     token: g.token, recipientName: g.recipient_name, occasion: g.occasion, messageType: g.message_type,
     messageText: g.message_text ?? "", ...(g.media_url ? { mediaUrl: g.media_url } : {}),
     hint: g.hint ?? null, revealed: g.revealed, hasReply: g.has_reply, banks: r.banks ?? [],
+    revealMode: g.reveal_mode === "guess" ? "guess" : "classic",
+    guess: g.guess ? { hints: g.guess.hints ?? [], triesLeft: Number(g.guess.tries_left ?? 3), result: g.guess.result ?? null } : null,
+    teaser: g.teaser ?? null, locked: Boolean(g.locked), unlockAt: g.unlock_at ?? null,
   };
 }
 
@@ -75,6 +87,19 @@ export async function revealGift({ data }: In): Promise<RevealedGift | { error: 
     signedIn: Boolean(r["signed_in"]),
     wallet: (r["wallet"] as RevealedGift["wallet"]) ?? null,
     verify: (r["verify"] as RevealedGift["verify"]) ?? null,
+    anonymous: Boolean(r["anonymous"]),
+    guessResult: (r["guess_result"] as RevealedGift["guessResult"]) ?? null,
+  };
+}
+
+/** One guess at who sent it. The server holds the answers and releases the next hint after a wrong guess. */
+export async function guessSender({ data }: { data: { token: string; guess: string } }) {
+  const r = await apiResult<Record<string, unknown>>(`/gifts/${encodeURIComponent(data.token)}/guess`, { method: "POST", body: { guess: data.guess } });
+  const result = r["result"] as "correct" | "wrong" | "out" | "finished" | undefined;
+  if (!result) return { result: "error" as const, triesLeft: 0, hints: [] as string[] };
+  return {
+    result, triesLeft: Number(r["tries_left"] ?? 0), hints: (r["hints"] as string[]) ?? [],
+    senderName: r["sender_name"] as string | undefined, senderFirst: r["sender_first"] as string | undefined,
   };
 }
 

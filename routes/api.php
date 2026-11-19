@@ -38,6 +38,7 @@ Route::prefix('v1')->name('api.v1.')->middleware(OptionalApiUser::class)->group(
     Route::get('/gifts/{token}/sealed', [RevealController::class, 'showJson']);
     Route::post('/gifts/{token}/status', [RevealController::class, 'updateStatus']);
     Route::post('/gifts/{token}/reveal', [RevealController::class, 'reveal']);
+    Route::post('/gifts/{token}/guess', [RevealController::class, 'guess']);
     Route::post('/gifts/{token}/reply', [RevealController::class, 'reply']);
     Route::post('/gifts/{token}/code', [RevealController::class, 'sendCode']);
     Route::post('/gifts/{token}/code/verify', [RevealController::class, 'verifyCode']);

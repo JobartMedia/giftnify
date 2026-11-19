@@ -31,12 +31,17 @@ Route::get('/payment/callback/{reference}', [PaymentController::class, 'callback
 Route::get('/gift/{token}', [RevealController::class, 'show'])->name('reveal.show');
 Route::post('/gift/{token}/status', [RevealController::class, 'updateStatus'])->name('reveal.status');
 Route::post('/gift/{token}/reveal', [RevealController::class, 'reveal'])->name('reveal.open');
+Route::post('/gift/{token}/guess', [RevealController::class, 'guess'])->name('reveal.guess');
 Route::post('/gift/{token}/reply', [RevealController::class, 'reply'])->name('reveal.reply');
 Route::post('/gift/{token}/code', [RevealController::class, 'sendCode'])->name('reveal.code');
 Route::post('/gift/{token}/code/verify', [RevealController::class, 'verifyCode'])->name('reveal.code.verify');
 Route::post('/gift-hint', [GiftController::class, 'hint'])->name('gifts.hint');
 Route::post('/gift/redeem', [RedemptionController::class, 'redeem'])->name('reveal.redeem');
 Route::post('/gift/verify-bank', [RedemptionController::class, 'verifyBank'])->name('reveal.verify_bank');
+
+// Creator gift links: giftnify.app/@name
+Route::get('/@{username}', [\App\Http\Controllers\CreatorController::class, 'show'])
+    ->where('username', '[A-Za-z0-9_]{3,30}')->name('creator.show');
 
 // GiftSense AI
 Route::get('/giftsense', [GiftSenseController::class, 'index'])->name('giftsense.index');
@@ -69,6 +74,11 @@ Route::middleware('auth')->group(function () {
     Route::post('/checkout/{token}/quote', [PaymentController::class, 'quote'])->name('gifts.quote');
     Route::post('/payment/start', [PaymentController::class, 'start'])->name('payments.start');
     Route::get('/gifts/{token}/success', [PaymentController::class, 'success'])->name('gifts.success');
+
+    // My gift link (creator)
+    Route::get('/creator', [\App\Http\Controllers\CreatorController::class, 'edit'])->name('creator.edit');
+    Route::post('/creator', [\App\Http\Controllers\CreatorController::class, 'update'])->name('creator.update');
+    Route::post('/creator/gifts/{token}/wall', [\App\Http\Controllers\CreatorController::class, 'wall'])->name('creator.wall');
 
     // Wallet
     Route::get('/wallet', [WalletController::class, 'index'])->name('wallet.index');

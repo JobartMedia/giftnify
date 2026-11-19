@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Gift;
 use App\Jobs\NotifySender;
 use App\Services\BankService;
+use App\Services\GuessGame;
 use App\Services\RecipientVerification;
 use App\Services\WalletService;
 use Illuminate\Http\JsonResponse;
@@ -36,6 +37,7 @@ class RevealController extends Controller
         'currency' => 'USD',
         'amount' => 50.00,
         'item' => null,
+        'guess_hints' => ['We met in school.', 'I always have my hair in dreads.', 'I called you last week.'],
     ];
 
     /** App (API): the sealed gift, same fields as the website reveal page. */
@@ -71,6 +73,11 @@ class RevealController extends Controller
                     'status' => 'Sent',
                     'revealed' => false,
                     'has_reply' => false,
+                    'reveal_mode' => 'guess',
+                    'guess' => ['hints' => array_slice(self::DEMO['guess_hints'], 0, 1), 'tries_left' => Gift::GUESS_TRIES, 'result' => null],
+                    'teaser' => "It's a 2-figure \$ gift.",
+                    'locked' => false,
+                    'unlock_at' => null,
                 ],
                 'banks' => BankService::names(),
             ];
@@ -80,6 +87,37 @@ class RevealController extends Controller
         if (!$gift) {
             return $error;
         }
+
+        // Scheduled gift still counting down: only what the lock screen needs. The message stays sealed.
+        if ($gift->isLocked()) {
+            return [
+                'gift' => [
+                    'token' => $gift->token,
+                    'is_demo' => false,
+                    'recipient_name' => $gift->recipient_name,
+                    'occasion' => $gift->occasion,
+                    'message_type' => $gift->message_type,
+                    'message_text' => '',
+                    'media_url' => null,
+                    'hint' => null,
+                    'status' => $gift->status,
+                    'revealed' => false,
+                    'has_reply' => false,
+                    'reveal_mode' => $gift->reveal_mode === 'guess' ? 'guess' : 'classic',
+                    'guess' => null,
+                    'teaser' => $gift->valueTeaser(),
+                    'locked' => true,
+                    'unlock_at' => $gift->unlock_at->toISOString(),
+                ],
+                'banks' => [],
+            ];
+        }
+
+        $guess = $gift->reveal_mode === 'guess' ? [
+            'hints' => GuessGame::visibleHints($gift),
+            'tries_left' => GuessGame::triesLeft($gift),
+            'result' => $gift->guess_result,
+        ] : null;
 
         return [
             'gift' => [
@@ -94,6 +132,11 @@ class RevealController extends Controller
                 'status' => $gift->status,
                 'revealed' => (bool)$gift->revealed_at || in_array($gift->status, ['Unlocked', 'Redeemed'], true),
                 'has_reply' => (bool)$gift->replied_at,
+                'reveal_mode' => $gift->reveal_mode === 'guess' ? 'guess' : 'classic', // anonymous is a surprise
+                'guess' => $guess,
+                'teaser' => $gift->valueTeaser(),
+                'locked' => false,
+                'unlock_at' => null,
             ],
             'banks' => BankService::names(),
         ];
@@ -105,6 +148,7 @@ class RevealController extends Controller
         if ($this->isDemo($token)) return response()->json(['ok' => true]);
 
         $gift = Gift::where('token', $token)->first();
+        if ($gift?->isLocked()) return response()->json(['error' => 'locked'], 423);
         if ($gift && $this->progress($validated['status']) > $this->progress($gift->status)) {
             $wasUnopened = $this->progress($gift->status) < $this->progress('Opened');
             $gift->update(['status' => $validated['status']]);
@@ -135,9 +179,16 @@ class RevealController extends Controller
         [$gift] = $this->findAvailable($token);
         if (!$gift) return response()->json(['error' => 'not_found'], 404);
 
+        if ($gift->isLocked()) return response()->json(['error' => 'locked'], 423);
+
         // The message has to have been started before anything is revealed.
         if ($this->progress($gift->status) < $this->progress('Opened')) {
             return response()->json(['error' => 'message_not_played'], 409);
+        }
+
+        // Revealing without finishing the guessing game counts as skipping it.
+        if ($gift->reveal_mode === 'guess' && !$gift->guess_result) {
+            $gift->guess_result = 'skipped';
         }
 
         if ($this->progress($gift->status) < $this->progress('Unlocked')) {
@@ -170,6 +221,62 @@ class RevealController extends Controller
             'wallet' => $wallet,
             'verify' => $verify,
         ]);
+    }
+
+    /**
+     * Guess who sent it. Three tries; each wrong guess unlocks the next hint.
+     * The name is only sent back when the guess is right.
+     */
+    public function guess(Request $request, string $token): JsonResponse
+    {
+        if ($this->limit($request, 'reveal-guess', 12)) {
+            return response()->json(['error' => 'rate_limited'], 429);
+        }
+        $validated = $request->validate(['guess' => 'required|string|min:1|max:80']);
+
+        if ($this->isDemo($token)) {
+            $key = "demo-guess:{$request->ip()}:{$token}";
+            $used = (int)\Illuminate\Support\Facades\Cache::get($key, 0);
+            $demo = new Gift(['sender_name' => self::DEMO['sender_name'], 'guess_hints' => self::DEMO['guess_hints'], 'guess_attempts' => $used]);
+            if (GuessGame::isCorrect($demo, $validated['guess'])) {
+                \Illuminate\Support\Facades\Cache::forget($key);
+                return response()->json(['result' => 'correct', 'sender_name' => self::DEMO['sender_name'], 'sender_first' => 'Seun']);
+            }
+            $demo->guess_attempts = $used + 1;
+            \Illuminate\Support\Facades\Cache::put($key, $used + 1, 600);
+            if ($demo->guess_attempts >= Gift::GUESS_TRIES) {
+                \Illuminate\Support\Facades\Cache::forget($key);
+                return response()->json(['result' => 'out', 'tries_left' => 0, 'hints' => GuessGame::visibleHints($demo)]);
+            }
+            return response()->json(['result' => 'wrong', 'tries_left' => GuessGame::triesLeft($demo), 'hints' => GuessGame::visibleHints($demo)]);
+        }
+
+        [$gift] = $this->findAvailable($token);
+        if (!$gift || $gift->reveal_mode !== 'guess') return response()->json(['error' => 'not_found'], 404);
+        if ($gift->isLocked()) return response()->json(['error' => 'locked'], 423);
+        if ($this->progress($gift->status) < $this->progress('Opened')) {
+            return response()->json(['error' => 'message_not_played'], 409);
+        }
+        if ($gift->guess_result) {
+            return response()->json(['result' => 'finished', 'tries_left' => 0, 'hints' => GuessGame::visibleHints($gift)]);
+        }
+
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($token, $validated) {
+            $gift = Gift::where('token', $token)->lockForUpdate()->first();
+            if (GuessGame::isCorrect($gift, $validated['guess'])) {
+                $gift->update(['guess_result' => 'correct', 'guess_attempts' => $gift->guess_attempts + 1]);
+                $name = $gift->revealedName();
+                return response()->json(['result' => 'correct', 'sender_name' => $name, 'sender_first' => explode(' ', $name)[0]]);
+            }
+            $gift->guess_attempts = min(Gift::GUESS_TRIES, $gift->guess_attempts + 1);
+            if ($gift->guess_attempts >= Gift::GUESS_TRIES) $gift->guess_result = 'out';
+            $gift->save();
+            return response()->json([
+                'result' => $gift->guess_result === 'out' ? 'out' : 'wrong',
+                'tries_left' => GuessGame::triesLeft($gift),
+                'hints' => GuessGame::visibleHints($gift),
+            ]);
+        });
     }
 
     /** The recipient's first reaction: a written note and/or a short voice note. */
@@ -234,8 +341,10 @@ class RevealController extends Controller
 
     private function revealPayload(object $gift): array
     {
-        $name = trim((string)$gift->sender_name) ?: 'A friend';
+        $name = $gift instanceof Gift ? $gift->revealedName() : (trim((string)$gift->sender_name) ?: 'A friend');
         return [
+            'anonymous' => $gift instanceof Gift && $gift->isAnonymous(),
+            'guess_result' => $gift instanceof Gift ? $gift->guess_result : null,
             'sender_name' => $name,
             'sender_first' => explode(' ', $name)[0],
             'currency' => $gift->currency,

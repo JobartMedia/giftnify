@@ -72,7 +72,19 @@ export default function Index({ gifts }: any) {
                   <span className="font-display text-lg font-extrabold text-ink">{g.item || money(Number(g.amount), g.currency)}</span>
                 </div>
 
-                {g.sender_hint && (
+                <div className="mt-3 flex flex-wrap gap-1.5 text-[11px] font-bold">
+                  {g.reveal_mode === 'guess' && (
+                    <span className="rounded-full bg-[#FFF4E0] px-2.5 py-1 text-[#8A5A00]">
+                      {g.guess_result === 'correct' ? `Guessed it in ${g.guess_attempts} ${g.guess_attempts === 1 ? 'try' : 'tries'}` : g.guess_result === 'out' ? "Couldn't guess you" : g.guess_result === 'skipped' ? 'Skipped the game' : 'Guess game'}
+                    </span>
+                  )}
+                  {g.reveal_mode === 'anonymous' && <span className="rounded-full bg-muted px-2.5 py-1 text-ink-soft">Anonymous</span>}
+                  {g.unlock_at && new Date(g.unlock_at).getTime() > Date.now() && (
+                    <span className="rounded-full bg-petal px-2.5 py-1 text-magenta-deep">Opens {new Date(g.unlock_at).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}</span>
+                  )}
+                </div>
+
+                {g.sender_hint && g.reveal_mode !== 'guess' && (
                   <p className="mt-3 text-xs text-ink-soft">
                     <span className="font-bold text-ink">Their hint: </span>{g.sender_hint}
                   </p>

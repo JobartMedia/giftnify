@@ -47,6 +47,10 @@ class WalletService
             if ($gift->sender_id && $gift->sender_id === $user->id) {
                 return ['result' => 'own_gift'];
             }
+            // Sent to a creator's gift link: only that creator's account can take it.
+            if ($gift->recipient_user_id && $gift->recipient_user_id !== $user->id) {
+                return ['result' => 'not_yours'];
+            }
             if ($gift->item) {
                 return ['result' => 'not_cash'];
             }
@@ -59,7 +63,7 @@ class WalletService
 
             $wallet = self::lockedWallet($user, $gift->currency);
             self::post($wallet, 'credit', 'gift_received', $gift->token, (float)$gift->amount,
-                "Gift from {$gift->sender_name}");
+                'Gift from ' . $gift->revealedName());
 
             $gift->update([
                 'status' => 'Redeemed',

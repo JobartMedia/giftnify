@@ -73,6 +73,18 @@ php artisan queue:work --tries=5 --backoff=30 --max-time=3600
 
 Restart it after every deploy: `php artisan queue:restart`.
 
+### Scheduler (scheduled "Birthday Bomb" gifts)
+
+Gifts set to open at a later time are released by `php artisan giftnify:release-scheduled`, which the scheduler runs every minute. Add this one cron line (Forge/Ploi: enable the scheduler):
+
+```bash
+* * * * * cd /path/to/giftnify && php artisan schedule:run >> /dev/null 2>&1
+```
+
+Without it, the teaser ("Something is coming…") still goes out, but the real gift notification is never sent at the unlock time. The recipient's link still opens itself when the countdown ends.
+
+Uploaded profile photos for creator gift links live on the `public` disk, so run `php artisan storage:link` once.
+
 ## 4. Payment webhooks
 
 | Provider | Webhook URL | Where to paste it |
@@ -100,6 +112,8 @@ php artisan queue:restart
 3. Use cPanel's terminal or SSH for the `php artisan` commands above.
 4. No long-running worker: set `QUEUE_CONNECTION=sync` (messages send during the request), or add a cron every minute:
    `* * * * * cd ~/giftnify && php artisan queue:work --stop-when-empty --tries=5 >/dev/null 2>&1`
+5. Add the scheduler cron too (needed for scheduled gifts):
+   `* * * * * cd ~/giftnify && php artisan schedule:run >/dev/null 2>&1`
 
 ## 7. Before you announce it
 

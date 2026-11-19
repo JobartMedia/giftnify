@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState, type ReactNod
 import {
   Lock, Play, Mic, PenLine, Square, Send, Check, Loader2, ChevronLeft, Volume2, VolumeX,
   Smartphone, Wifi, Zap, Wallet, CreditCard, Landmark, RotateCcw, ShieldCheck,
+  Lightbulb, HelpCircle, Timer, Share2, Target,
 } from 'lucide-react';
 import { unlockRevealSound, playRevealSound, playCountdownTick, setRevealMuted, isRevealMuted, playGiftLanded, stopGiftLanded } from './revealSound';
 
@@ -9,7 +10,10 @@ import { unlockRevealSound, playRevealSound, playCountdownTick, setRevealMuted, 
  * Giftnify mystery reveal.
  *
  * Sequence (the order is the product):
+ *   locked  → scheduled gift: countdown to its opening time ("Birthday Bomb")
  *   sealed  → hint + "Play the message"            (tap unlocks sound)
+ *   guess   → (guess mode) 3 tries to guess the sender, a new hint per try, skippable
+ *   guessed → "It was… Adebayo!" or "So close", then the message
  *   message → video / voice / letter
  *   hold    → REVEAL_PAUSE_MS of total stillness   (never zero)
  *   countdown → 8…1, a tick each second, the suspense
@@ -45,6 +49,22 @@ export interface RevealGift {
   hint?: string | null;
   revealed: boolean;
   hasReply: boolean;
+  /** 'guess': the recipient guesses who sent it before the message plays. */
+  revealMode?: 'classic' | 'guess';
+  guess?: { hints: string[]; triesLeft: number; result: string | null } | null;
+  /** "It's a 5-figure ₦ gift." — how big, never how much. */
+  teaser?: string | null;
+  /** Scheduled gift still counting down to its opening time. */
+  locked?: boolean;
+  unlockAt?: string | null;
+}
+
+export interface GuessResult {
+  result: 'correct' | 'wrong' | 'out' | 'finished' | 'error';
+  triesLeft: number;
+  hints: string[];
+  senderName?: string;
+  senderFirst?: string;
 }
 
 export interface RevealData {
@@ -59,6 +79,9 @@ export interface RevealData {
   wallet?: { credited: boolean; balance: number; currency: string } | null;
   /** When the gift was addressed to a phone/email, a one-time code proves it's them before money moves. */
   verify?: { required: boolean; channel: 'email' | 'phone' | null; destination: string | null } | null;
+  /** The sender chose to stay anonymous: the name is "Anonymous". */
+  anonymous?: boolean;
+  guessResult?: string | null;
 }
 
 export type ClaimResult = { result: string; balance?: number | null; currency?: string | null };
@@ -79,6 +102,8 @@ export interface RevealApi {
   sendCode?(): Promise<string>;
   /** ok | wrong | expired | locked */
   verifyCode?(code: string): Promise<string>;
+  /** Guess who sent it (guess mode). */
+  guess?(text: string): Promise<GuessResult>;
 }
 
 interface Props {
@@ -95,7 +120,8 @@ interface Props {
   signInHref?: string;
 }
 
-type Stage = 'sealed' | 'message' | 'hold' | 'countdown' | 'reveal' | 'redeem' | 'done';
+type Stage = 'locked' | 'sealed' | 'guess' | 'guessed' | 'message' | 'hold' | 'countdown' | 'reveal' | 'redeem' | 'done';
+type GuessOutcome = { kind: 'correct'; name: string; tries: number } | { kind: 'out' } | { kind: 'skipped' };
 
 const FALLBACK_HINT = 'Someone who thought of you the moment this day came around.';
 
@@ -122,7 +148,9 @@ export function formatValue(amount: number, currency: string) {
 }
 
 export function RevealTheatre({ gift, api, icon, logo, createHref = '/create', walletHref = '/wallet', signInHref, banks }: Props) {
-  const [stage, setStage] = useState<Stage>('sealed');
+  const [stage, setStage] = useState<Stage>(gift.locked ? 'locked' : 'sealed');
+  const [outcome, setOutcome] = useState<GuessOutcome | null>(null);
+  const playsGame = gift.revealMode === 'guess' && !!api.guess && !gift.revealed && !gift.guess?.result;
   const [data, setData] = useState<RevealData | null>(null);
   const [frame, setFrame] = useState<string | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
@@ -141,7 +169,7 @@ export function RevealTheatre({ gift, api, icon, logo, createHref = '/create', w
 
   // "A gift has landed": the Giftnify sound plays as the sealed gift appears (once).
   useEffect(() => {
-    if (!gift.revealed) playGiftLanded();
+    if (!gift.revealed && !gift.locked) playGiftLanded();
     return () => stopGiftLanded();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -150,6 +178,14 @@ export function RevealTheatre({ gift, api, icon, logo, createHref = '/create', w
     stopGiftLanded();
     unlockRevealSound();
     api.markOpened();
+    setStage(playsGame ? 'guess' : 'message');
+  };
+
+  const skipGame = () => {
+    stopGiftLanded();
+    unlockRevealSound();
+    api.markOpened();
+    setOutcome({ kind: 'skipped' });
     setStage('message');
   };
 
@@ -210,9 +246,22 @@ export function RevealTheatre({ gift, api, icon, logo, createHref = '/create', w
         </header>
 
         <div className="flex flex-1 flex-col justify-center py-6">
+          {stage === 'locked' && <Locked gift={gift} icon={icon} />}
           {stage === 'sealed' && (
-            <Sealed gift={gift} icon={icon} onStart={start} onSkip={gift.revealed ? skipToGift : undefined} failure={failure} />
+            <Sealed gift={gift} icon={icon} game={playsGame} onStart={start} onSkipGame={playsGame ? skipGame : undefined}
+              onSkip={gift.revealed ? skipToGift : undefined} failure={failure} />
           )}
+          {stage === 'guess' && api.guess && (
+            <GuessGame
+              gift={gift}
+              api={api}
+              onDone={(o) => { setOutcome(o); setStage(o.kind === 'skipped' ? 'message' : 'guessed'); if (o.kind === 'correct') playCountdownTick(1, 1); }}
+            />
+          )}
+          {stage === 'guessed' && outcome && outcome.kind !== 'skipped' && (
+            <Guessed gift={gift} outcome={outcome} onContinue={() => setStage('message')} />
+          )}
+          {stage === 'guessed' && outcome?.kind === 'correct' && <ConfettiBurst />}
           {(stage === 'message' || stage === 'hold') && (
             <MessageStage
               gift={gift}
@@ -223,10 +272,10 @@ export function RevealTheatre({ gift, api, icon, logo, createHref = '/create', w
               failure={failure}
             />
           )}
-          {stage === 'countdown' && <Countdown onDone={onCountdownEnd} />}
+          {stage === 'countdown' && <Countdown onDone={onCountdownEnd} label={outcome?.kind === 'correct' ? `Unwrapping ${outcome.name.split(' ')[0]}'s gift` : 'Who sent it?'} />}
           {stage === 'reveal' && <ConfettiBurst />}
           {stage === 'reveal' && data && (
-            <RevealStage gift={gift} data={data} api={api} hasFrame={!!frame} walletHref={walletHref} onUse={() => setStage('redeem')} />
+            <RevealStage gift={gift} data={data} api={api} hasFrame={!!frame} walletHref={walletHref} guessed={outcome?.kind === 'correct' || data.guessResult === 'correct'} onUse={() => setStage('redeem')} />
           )}
           {stage === 'redeem' && data && (
             <Redeem gift={gift} data={data} api={api} signInHref={signInHref} banks={banks} onBack={() => setStage('reveal')}
@@ -262,8 +311,8 @@ export function RevealTheatre({ gift, api, icon, logo, createHref = '/create', w
 
 /* ================================================================== */
 
-function Sealed({ gift, icon, onStart, onSkip, failure }: {
-  gift: RevealGift; icon: Props['icon']; onStart: () => void; onSkip?: () => void; failure: string | null;
+function Sealed({ gift, icon, game, onStart, onSkipGame, onSkip, failure }: {
+  gift: RevealGift; icon: Props['icon']; game: boolean; onStart: () => void; onSkipGame?: () => void; onSkip?: () => void; failure: string | null;
 }) {
   const v = VERB[gift.messageType] ?? VERB.text;
   const hint = gift.hint?.trim() || FALLBACK_HINT;
@@ -281,13 +330,24 @@ function Sealed({ gift, icon, onStart, onSkip, failure }: {
         {gift.recipientName && gift.recipientName !== 'You' ? `${gift.recipientName}, you got a gift.` : 'You got a gift.'}
       </h1>
 
-      <figure className="mx-auto mt-6 max-w-sm rounded-[1.5rem] bg-white/[0.07] px-5 py-4 text-left ring-1 ring-inset ring-white/10">
-        <figcaption className="text-xs font-bold text-[#FF8AC4]">A hint</figcaption>
-        <blockquote className="mt-1.5 font-display text-[1.15rem] font-semibold leading-snug text-white/95">{hint}</blockquote>
-      </figure>
+      {gift.teaser && <TeaserChip text={gift.teaser} />}
+
+      {game ? (
+        <div className="mx-auto mt-6 max-w-sm rounded-[1.5rem] bg-white/[0.07] px-5 py-4 text-left ring-1 ring-inset ring-white/10">
+          <p className="flex items-center gap-2 text-xs font-bold text-[#FFD27A]"><HelpCircle className="size-4" aria-hidden /> Guess who sent it</p>
+          <p className="mt-1.5 font-display text-[1.15rem] font-semibold leading-snug text-white/95">
+            You have 3 tries. Every wrong guess unlocks a new hint.
+          </p>
+        </div>
+      ) : (
+        <figure className="mx-auto mt-6 max-w-sm rounded-[1.5rem] bg-white/[0.07] px-5 py-4 text-left ring-1 ring-inset ring-white/10">
+          <figcaption className="text-xs font-bold text-[#FF8AC4]">A hint</figcaption>
+          <blockquote className="mt-1.5 font-display text-[1.15rem] font-semibold leading-snug text-white/95">{hint}</blockquote>
+        </figure>
+      )}
 
       <p className="mx-auto mt-5 max-w-xs text-sm text-white/60">
-        {v.verb} their {v.noun} to find out who sent it and what's inside.
+        {game ? `Guess first, then ${v.verb.toLowerCase()} their ${v.noun}.` : `${v.verb} their ${v.noun} to find out who sent it and what's inside.`}
       </p>
 
       {failure && <p role="alert" className="mt-4 rounded-xl bg-white/10 p-3 text-sm">{failure}</p>}
@@ -297,14 +357,212 @@ function Sealed({ gift, icon, onStart, onSkip, failure }: {
         onClick={onStart}
         className="mt-7 inline-flex h-14 w-full items-center justify-center gap-2 rounded-full bg-gradient-primary text-base font-extrabold text-white shadow-glow transition active:scale-[0.98]"
       >
-        {gift.messageType !== 'text' && <Play className="size-5 fill-current" aria-hidden />}
-        {v.cta}
+        {game ? <><HelpCircle className="size-5" aria-hidden /> Start guessing</> : <>{gift.messageType !== 'text' && <Play className="size-5 fill-current" aria-hidden />}{v.cta}</>}
       </button>
+      {onSkipGame && (
+        <button type="button" onClick={onSkipGame} className="mt-3 h-12 w-full rounded-full text-sm font-bold text-white/75 transition hover:text-white">
+          Skip the game. {v.cta}
+        </button>
+      )}
       {onSkip && (
         <button type="button" onClick={onSkip} className="mt-3 h-12 w-full rounded-full text-sm font-bold text-white/75 transition hover:text-white">
           You've opened this before. Go to your gift
         </button>
       )}
+    </div>
+  );
+}
+
+/* ================================================================== */
+
+function TeaserChip({ text }: { text: string }) {
+  return (
+    <p className="mx-auto mt-4 inline-flex items-center gap-1.5 rounded-full bg-[#FFD27A]/15 px-3.5 py-1.5 text-sm font-bold text-[#FFD27A] ring-1 ring-inset ring-[#FFD27A]/25">
+      <span aria-hidden>👀</span> {text}
+    </p>
+  );
+}
+
+/* ---------- Scheduled gift: counting down to its opening time ---------- */
+
+function Locked({ gift, icon }: { gift: RevealGift; icon: Props['icon'] }) {
+  const target = useMemo(() => (gift.unlockAt ? new Date(gift.unlockAt).getTime() : Date.now()), [gift.unlockAt]);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const left = Math.max(0, target - now);
+  useEffect(() => {
+    // Open the moment it unlocks (a short grace so the server agrees).
+    if (left === 0) { const t = setTimeout(() => window.location.reload(), 1200); return () => clearTimeout(t); }
+    return undefined;
+  }, [left]);
+
+  const s = Math.floor(left / 1000);
+  const parts = [
+    { v: Math.floor(s / 86400), l: 'days' },
+    { v: Math.floor((s % 86400) / 3600), l: 'hours' },
+    { v: Math.floor((s % 3600) / 60), l: 'min' },
+    { v: s % 60, l: 'sec' },
+  ].filter((p, i) => i > 0 || p.v > 0);
+  const when = new Date(target).toLocaleString(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
+  const lastMinute = s > 0 && s <= 60;
+
+  return (
+    <div className="text-center">
+      <div className="relative mx-auto grid size-40 place-items-center">
+        <span aria-hidden className="absolute inset-0 rounded-full bg-[radial-gradient(closest-side,rgba(255,210,122,.25),transparent)]" />
+        <span className={lastMinute ? 'gn-shake relative' : 'gn-breathe relative'}>{icon('gift', 132)}</span>
+        <span className="absolute bottom-1 right-2 grid size-11 place-items-center rounded-full bg-plum ring-4 ring-plum">
+          <Lock className="size-[18px] text-[#FFD27A]" aria-hidden />
+        </span>
+      </div>
+      <h1 className="mt-7 font-display text-[2.3rem] font-extrabold leading-[1.02] tracking-tight">
+        {lastMinute ? 'Almost time…' : 'Something is coming…'}
+      </h1>
+      <p className="mx-auto mt-3 max-w-xs text-white/70">
+        {gift.recipientName && gift.recipientName !== 'You' ? `${gift.recipientName}, someone` : 'Someone'} scheduled a {gift.occasion.toLowerCase()} mystery gift for you. It unlocks {when}.
+      </p>
+      {gift.teaser && <TeaserChip text={gift.teaser} />}
+
+      <div className="mx-auto mt-8 flex max-w-sm justify-center gap-2.5" role="timer" aria-label={`Unlocks in ${parts.map((p) => `${p.v} ${p.l}`).join(' ')}`}>
+        {parts.map((p) => (
+          <div key={p.l} className="min-w-[4.5rem] rounded-2xl bg-white/[0.08] px-3 py-3 ring-1 ring-inset ring-white/10">
+            <span className="block font-display text-4xl font-extrabold tabular-nums">{String(p.v).padStart(2, '0')}</span>
+            <span className="mt-1 block text-xs font-semibold text-white/60">{p.l}</span>
+          </div>
+        ))}
+      </div>
+      <p className="mx-auto mt-6 flex max-w-xs items-center justify-center gap-1.5 text-sm text-white/60">
+        <Timer className="size-4" aria-hidden /> Keep this page open, or come back to the same link.
+      </p>
+    </div>
+  );
+}
+
+/* ---------- Guess who sent it ---------- */
+
+function GuessGame({ gift, api, onDone }: { gift: RevealGift; api: RevealApi; onDone: (o: GuessOutcome) => void }) {
+  const [hints, setHints] = useState<string[]>(gift.guess?.hints?.length ? gift.guess.hints : []);
+  const [triesLeft, setTriesLeft] = useState(gift.guess?.triesLeft ?? 3);
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [wrong, setWrong] = useState<string | null>(null);
+  const [shake, setShake] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const attempt = 3 - triesLeft + 1;
+  const last = triesLeft === 1;
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const g = text.trim();
+    if (!g || busy) return;
+    setBusy(true);
+    setWrong(null);
+    try {
+      const r = await api.guess!(g);
+      if (r.result === 'correct') {
+        onDone({ kind: 'correct', name: r.senderName || g, tries: attempt });
+        return;
+      }
+      if (r.result === 'out' || r.result === 'finished') {
+        onDone({ kind: 'out' });
+        return;
+      }
+      if (r.result === 'error') {
+        setWrong("That didn't go through. Check your connection and try again.");
+        return;
+      }
+      setHints(r.hints);
+      setTriesLeft(r.triesLeft);
+      setWrong(`Not ${g}. A new hint is unlocked.`);
+      setText('');
+      setShake((n) => n + 1);
+      inputRef.current?.focus();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between">
+        <p className="font-display text-xl font-extrabold">Guess #{attempt}</p>
+        <span className={`rounded-full px-3 py-1 text-xs font-extrabold ${last ? 'bg-[#FF5A7A]/20 text-[#FF9DB0]' : 'bg-[#FFD27A]/15 text-[#FFD27A]'}`}>
+          {last ? 'Last chance' : `${triesLeft} tries left`}
+        </span>
+      </div>
+      <h2 className="mt-6 text-center font-display text-[2.2rem] font-extrabold leading-tight">
+        {attempt === 1 ? 'Who is it?' : last ? 'Final guess' : 'Take another guess'}
+      </h2>
+
+      <ul className="mt-6 grid gap-2.5" aria-live="polite">
+        {hints.map((h, i) => {
+          const newest = i === hints.length - 1;
+          return (
+            <li key={i} className={`flex items-start gap-3 rounded-2xl px-4 py-3 text-left ${newest ? 'gn-rise bg-[#FFD27A] text-plum' : 'bg-white/[0.08] text-white/90 ring-1 ring-inset ring-white/10'}`}>
+              {newest ? <Lightbulb className="mt-0.5 size-5 shrink-0" aria-hidden /> : <Check className="mt-0.5 size-5 shrink-0 text-[#FFD27A]" aria-hidden />}
+              <span className="font-semibold"><span className="font-extrabold">Hint {i + 1}:</span> {h}</span>
+            </li>
+          );
+        })}
+      </ul>
+
+      <form onSubmit={submit} className="mt-6">
+        <label htmlFor="gn-guess" className="sr-only">Your guess</label>
+        <input
+          key={shake}
+          ref={inputRef}
+          id="gn-guess"
+          autoFocus
+          autoComplete="off"
+          maxLength={80}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="Type a name…"
+          className={`h-14 w-full rounded-2xl bg-white/[0.08] px-5 text-lg font-semibold text-white outline-none ring-1 ring-inset ring-white/15 placeholder:text-white/40 focus:ring-2 focus:ring-[#FFD27A] ${shake ? 'gn-shake' : ''}`}
+        />
+        {wrong && <p role="alert" className="mt-3 text-center text-sm font-semibold text-[#FF9DB0]">{wrong}</p>}
+        <button
+          type="submit"
+          disabled={!text.trim() || busy}
+          className="mt-4 inline-flex h-14 w-full items-center justify-center gap-2 rounded-full bg-[#FFD27A] text-base font-extrabold text-plum transition active:scale-[0.98] disabled:opacity-50"
+        >
+          {busy ? <Loader2 className="size-5 animate-spin" aria-hidden /> : last ? 'Submit final guess' : 'Submit guess'}
+        </button>
+      </form>
+      <button type="button" onClick={() => onDone({ kind: 'skipped' })} className="mt-3 h-12 w-full rounded-full text-sm font-bold text-white/70 transition hover:text-white">
+        Skip. Just show me the message
+      </button>
+    </div>
+  );
+}
+
+function Guessed({ gift, outcome, onContinue }: { gift: RevealGift; outcome: GuessOutcome; onContinue: () => void }) {
+  const v = VERB[gift.messageType] ?? VERB.text;
+  if (outcome.kind === 'correct') {
+    const initials = outcome.name.split(/\s+/).map((p) => p[0]).join('').slice(0, 2).toUpperCase();
+    return (
+      <div className="text-center">
+        <p className="gn-rise font-display text-2xl font-extrabold text-[#FFD27A]">It was…</p>
+        <h1 className="gn-pop mt-2 font-display text-[3.2rem] font-extrabold uppercase leading-[0.95] tracking-tight">{outcome.name.split(' ')[0]}!</h1>
+        <p className="mt-4 text-white/75">You guessed it{outcome.tries === 1 ? ' on the first try' : ` in ${outcome.tries} tries`}.</p>
+        <span className="mx-auto mt-7 grid size-24 place-items-center rounded-full bg-[#FFD27A] font-display text-3xl font-extrabold text-plum ring-4 ring-[#FFD27A]/30">{initials}</span>
+        <p className="mt-3 font-bold">{outcome.name}</p>
+        <button type="button" onClick={onContinue} className="mt-8 inline-flex h-14 w-full items-center justify-center gap-2 rounded-full bg-gradient-primary text-base font-extrabold text-white shadow-glow">
+          {gift.messageType !== 'text' && <Play className="size-5 fill-current" aria-hidden />} {v.cta}, then see your gift
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div className="text-center">
+      <h1 className="font-display text-[2.6rem] font-extrabold leading-tight">So close!</h1>
+      <p className="mx-auto mt-3 max-w-xs text-white/75">No more tries. Their {v.noun} might give it away. The name appears when it ends.</p>
+      <button type="button" onClick={onContinue} className="mt-8 inline-flex h-14 w-full items-center justify-center gap-2 rounded-full bg-gradient-primary text-base font-extrabold text-white shadow-glow">
+        {gift.messageType !== 'text' && <Play className="size-5 fill-current" aria-hidden />} {v.cta}
+      </button>
     </div>
   );
 }
@@ -429,7 +687,7 @@ function MessageStage({ gift, icon, holding, onNearEnd, onEnd, failure }: {
 
 /* ================================================================== */
 
-function Countdown({ onDone }: { onDone: () => void }) {
+function Countdown({ onDone, label = 'Who sent it?' }: { onDone: () => void; label?: string }) {
   const [n, setN] = useState(COUNTDOWN_SECONDS);
   const done = useRef(onDone);
   done.current = onDone;
@@ -449,7 +707,7 @@ function Countdown({ onDone }: { onDone: () => void }) {
   const C = 2 * Math.PI * R;
   return (
     <div className="text-center" role="timer" aria-live="assertive" aria-label={`Revealing in ${n}`}>
-      <p className="text-lg font-semibold text-white/75">Who sent it?</p>
+      <p className="text-lg font-semibold text-white/75">{label}</p>
       <div className="relative mx-auto mt-6 grid size-56 place-items-center">
         <span aria-hidden className="absolute inset-0 animate-ping rounded-full bg-[#E5007D]/15 [animation-duration:1s]" />
         <svg aria-hidden viewBox="0 0 200 200" className="absolute inset-0 -rotate-90">
@@ -469,7 +727,7 @@ function Countdown({ onDone }: { onDone: () => void }) {
         </svg>
         <span key={n} className="gn-count font-display text-[7rem] font-extrabold leading-none tabular-nums">{n}</span>
       </div>
-      <p className="mt-6 text-sm text-white/60">Revealing the sender in {n} {n === 1 ? 'second' : 'seconds'}</p>
+      <p className="mt-6 text-sm text-white/60">Revealing in {n} {n === 1 ? 'second' : 'seconds'}</p>
     </div>
   );
 }
@@ -560,8 +818,8 @@ function CountUp({ to, currency }: { to: number; currency: string }) {
   return <>{formatValue(shown, currency)}</>;
 }
 
-function RevealStage({ gift, data, api, hasFrame, walletHref, onUse }: {
-  gift: RevealGift; data: RevealData; api: RevealApi; hasFrame: boolean; walletHref: string; onUse: () => void;
+function RevealStage({ gift, data, api, hasFrame, walletHref, guessed, onUse }: {
+  gift: RevealGift; data: RevealData; api: RevealApi; hasFrame: boolean; walletHref: string; guessed?: boolean; onUse: () => void;
 }) {
   const [settled, setSettled] = useState(prefersReducedMotion());
   const [mode, setMode] = useState<'choose' | 'voice' | 'text' | 'sent'>(gift.hasReply ? 'sent' : 'choose');
@@ -571,7 +829,8 @@ function RevealStage({ gift, data, api, hasFrame, walletHref, onUse }: {
     return () => clearTimeout(t);
   }, [settled]);
 
-  const initials = data.senderName.split(/\s+/).map((p) => p[0]).join('').slice(0, 2).toUpperCase();
+  const initials = data.anonymous ? '?' : data.senderName.split(/\s+/).map((p) => p[0]).join('').slice(0, 2).toUpperCase();
+  const replyTo = data.anonymous ? 'them' : data.senderFirst;
   const style = { ['--gn-dissolve-ms' as any]: `${DISSOLVE_MS}ms` };
 
   return (
@@ -585,8 +844,14 @@ function RevealStage({ gift, data, api, hasFrame, walletHref, onUse }: {
             {initials}
           </span>
           <h1 className="mt-5 font-display text-[2.7rem] font-extrabold leading-[1.02] tracking-tight" aria-live="polite">
-            {data.senderName}
+            {data.anonymous ? 'Someone special' : data.senderName}
           </h1>
+          {data.anonymous && <p className="mt-2 text-sm font-semibold text-white/70">They chose to stay anonymous.</p>}
+          {guessed && !data.anonymous && (
+            <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-[#FFD27A]/15 px-3 py-1 text-sm font-bold text-[#FFD27A]">
+              <Target className="size-4" aria-hidden /> You guessed it
+            </p>
+          )}
         </div>
       </div>
 
@@ -612,7 +877,7 @@ function RevealStage({ gift, data, api, hasFrame, walletHref, onUse }: {
       <div className={`mt-7 text-left ${settled ? 'gn-rise' : 'invisible'}`} aria-hidden={!settled}>
           {mode === 'choose' && (
             <>
-              <p className="text-center text-sm font-semibold text-white/80">Tell {data.senderFirst} how it felt, while it's fresh.</p>
+              <p className="text-center text-sm font-semibold text-white/80">Tell {replyTo} how it felt, while it's fresh.</p>
               <div className="mt-3 grid grid-cols-2 gap-2.5">
                 <button type="button" onClick={() => setMode('voice')} className="inline-flex h-14 items-center justify-center gap-2 rounded-full bg-white font-extrabold text-plum transition hover:bg-petal active:scale-[0.98]">
                   <Mic className="size-5" aria-hidden /> Voice note
@@ -623,13 +888,23 @@ function RevealStage({ gift, data, api, hasFrame, walletHref, onUse }: {
               </div>
             </>
           )}
-          {mode === 'voice' && <VoiceReply first={data.senderFirst} api={api} onSent={() => setMode('sent')} onCancel={() => setMode('choose')} />}
-          {mode === 'text' && <TextReply first={data.senderFirst} api={api} onSent={() => setMode('sent')} onCancel={() => setMode('choose')} />}
+          {mode === 'voice' && <VoiceReply first={replyTo} api={api} onSent={() => setMode('sent')} onCancel={() => setMode('choose')} />}
+          {mode === 'text' && <TextReply first={replyTo} api={api} onSent={() => setMode('sent')} onCancel={() => setMode('choose')} />}
           {mode === 'sent' && (
             <p className="flex items-center justify-center gap-2 rounded-2xl bg-white/[0.07] p-3.5 text-sm font-semibold">
-              <Check className="size-4 text-[#7EF0C4]" aria-hidden /> {data.senderFirst} will get your reply.
+              <Check className="size-4 text-[#7EF0C4]" aria-hidden /> {data.anonymous ? 'They' : data.senderFirst} will get your reply.
             </p>
           )}
+
+          {/* Share the moment (never the amount). */}
+          <a
+            href={`https://wa.me/?text=${encodeURIComponent(`I just got Giftnified! 🎁 ${data.anonymous ? 'Someone' : data.senderFirst} sent me a ${gift.occasion.toLowerCase()} mystery gift. Send one: https://giftnify.app`)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-3 inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-[#25D366]/15 text-sm font-bold text-[#7EF0A8] ring-1 ring-inset ring-[#25D366]/30 transition hover:bg-[#25D366]/25"
+          >
+            <Share2 className="size-4" aria-hidden /> Post it on WhatsApp Status
+          </a>
 
           {data.wallet?.credited && (
             <a

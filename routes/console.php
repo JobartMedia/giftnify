@@ -38,3 +38,20 @@ Artisan::command('giftnify:make-admin {email} {--name=} {--role=admin}', functio
     }
     return 0;
 })->purpose('Create or promote a Giftnify staff account');
+
+/*
+ | Scheduled gifts: when a gift's unlock time arrives, send the real "your gift
+ | is here" message. Runs every minute from the scheduler (see DEPLOY.md cron).
+ */
+Artisan::command('giftnify:release-scheduled', function () {
+    $due = \App\Models\Gift::where('delivery_status', 'scheduled')
+        ->whereNotNull('unlock_at')->where('unlock_at', '<=', now())
+        ->whereNotIn('status', ['Awaiting Payment', 'Cancelled', 'Refunded'])
+        ->limit(200)->pluck('token');
+    foreach ($due as $token) {
+        \App\Jobs\DeliverGift::dispatch($token);
+    }
+    $this->info("Released {$due->count()} scheduled gift(s).");
+})->purpose('Send scheduled gifts whose unlock time has arrived');
+
+\Illuminate\Support\Facades\Schedule::command('giftnify:release-scheduled')->everyMinute()->withoutOverlapping();

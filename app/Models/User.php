@@ -21,6 +21,12 @@ class User extends Authenticatable
         'avatar_url',
         'phone',
         'status',
+        'username',
+        'bio',
+        'creator_enabled',
+        'creator_currency',
+        'creator_amounts',
+        'creator_wall',
     ];
 
     protected $hidden = [
@@ -33,6 +39,9 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'creator_enabled' => 'boolean',
+            'creator_amounts' => 'array',
+            'creator_wall' => 'boolean',
         ];
     }
 

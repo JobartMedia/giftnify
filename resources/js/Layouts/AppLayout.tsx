@@ -26,6 +26,7 @@ export function Wordmark({ light = false }: { light?: boolean }) {
 const DESKTOP_NAV = [
   { href: '/', label: 'Home' },
   { href: '/giftsense', label: 'Giftgenie A.i' },
+  { href: '/creator', label: 'My gift link' },
   { href: '/occasions', label: 'Occasions' },
   { href: '/demo', label: 'Sample unboxing' },
   { href: '/help', label: 'Help' },
@@ -61,7 +62,7 @@ export const AppLayout: React.FC<Props> = ({ children }) => {
 
   // Signed-in: the wallet chip sits in the header, Help and the sample move to the footer.
   const navItems = user
-    ? [...DESKTOP_NAV.slice(0, 3), { href: '/activity', label: 'Activity' }]
+    ? [...DESKTOP_NAV.slice(0, 4), { href: '/activity', label: 'Activity' }]
     : DESKTOP_NAV;
 
   const mainBalance = (user?.wallets ?? []).find((w: any) => w.balance > 0);
@@ -194,6 +195,7 @@ export const AppLayout: React.FC<Props> = ({ children }) => {
             <ul className="space-y-1">
               {[
                 ['/create', 'Send a mystery gift'],
+                ['/creator', 'Get your gift link'],
                 ['/giftsense', 'Giftgenie A.i ideas'],
                 ['/occasions', 'Occasions & reminders'],
                 ['/demo', 'Sample unboxing'],
