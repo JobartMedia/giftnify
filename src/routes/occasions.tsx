@@ -1,12 +1,14 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell, Avatar, Btn, Card, Chip, Field, PageHeader } from "@/components/giftnify/ui";
 import { Icon3D } from "@/components/giftnify/Icon3D";
 import { ApiError } from "@/lib/api";
-import { useContacts, initialsOf, saveContact, deleteContact, importContacts, readPhoneContacts, updateBirthdaySettings } from "@/lib/contacts";
+import { useContacts, initialsOf, saveContact, deleteContact, importContacts, readPhoneContacts, updateBirthdaySettings,
+  googleStatus, connectGoogle, googleContacts, googleCalendar, googleSync, googleDisconnect } from "@/lib/contacts";
 import { ContactImport } from "@/components/giftnify/contacts/ContactImport";
+import { GoogleConnect, type GoogleStatus } from "@/components/giftnify/contacts/GoogleConnect";
 import { useMe } from "@/lib/auth";
 import { Capacitor } from "@capacitor/core";
 import { useContent } from "@/lib/content";
@@ -37,6 +39,24 @@ function Occasions() {
   const undated = contacts.filter((c) => !c.remind_date && !c.occasion_date);
   const { me, refresh: refreshMe } = useMe();
   const isApp = typeof window !== "undefined" && Capacitor.isNativePlatform();
+  const [google, setGoogle] = useState<GoogleStatus>({ available: false, connected: false });
+  // Check again when they come back from Google's sign-in in the browser.
+  useEffect(() => {
+    if (!me) return;
+    const load = () => { googleStatus().then(setGoogle).catch(() => {}); };
+    load();
+    const onVis = () => { if (document.visibilityState === "visible") { load(); refresh(); } };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me?.id]);
+  const gcall = async (fn: () => Promise<GoogleStatus>, ok: string) => {
+    try { setGoogle(await fn()); toast.success(ok); }
+    catch (err) {
+      if (err instanceof ApiError && err.status === 409) { await connectGoogle("calendar"); return; }
+      toast.error(err instanceof ApiError ? err.message : "Google didn't respond. Try again.");
+    }
+  };
   const setPref = async (v: { birthday_visible?: boolean; birthday_reminders?: boolean }) => {
     try { await updateBirthdaySettings(v); refreshMe(); toast.success("Saved"); } catch { toast.error("Couldn't save. Try again."); }
   };
@@ -113,8 +133,19 @@ function Occasions() {
           </div>
 
           <div className="mt-6">
+            <GoogleConnect
+              status={google}
+              onConnect={(want) => { connectGoogle(want).catch((err) => toast.error(err instanceof ApiError ? err.message : "Couldn't open Google.")); }}
+              onCalendar={(enabled) => gcall(() => googleCalendar(enabled), enabled ? "Birthdays added to your Google Calendar" : "Giftnify Birthdays calendar removed")}
+              onSync={() => gcall(googleSync, "Calendar updated")}
+              onDisconnect={() => gcall(googleDisconnect, "Google disconnected")}
+            />
+          </div>
+
+          <div className="mt-6">
             <ContactImport
               native={isApp ? readPhoneContacts : null}
+              google={google.connected && google.contacts ? googleContacts : null}
               save={async (rows, source) => {
                 try { const r = await importContacts(rows, source); refresh(); return r; }
                 catch (err) { return { error: err instanceof ApiError ? err.message : "Couldn't save. Try again." }; }

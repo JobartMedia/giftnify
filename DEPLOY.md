@@ -149,3 +149,19 @@ The app has no database or secrets of its own; it only needs to know the website
 Payment webhooks always go to the **website** URLs in section 4, even for gifts paid from the app.
 
 If you don't need a separate app yet, skip this section: the website is already installable on phones (Add to Home Screen) and has every feature.
+
+
+## Google Contacts & Calendar (optional)
+
+Lets people import Google Contacts (with birthdays) and get a "Giftnify Birthdays" calendar with reminders a week and a day before. Nothing shows to users until keys are saved.
+
+1. console.cloud.google.com → new project "Giftnify".
+2. APIs & Services → Library → enable **People API** and **Google Calendar API**.
+3. Google Auth Platform → Branding: app name, logo, support email, privacy policy URL, home page. Data access → add scopes `.../auth/contacts.readonly` and `.../auth/calendar.app.created`.
+4. Clients → Create client → Web application:
+   - Authorised JavaScript origin: `https://your-domain`
+   - Authorised redirect URI: `https://your-domain/integrations/google/callback`
+5. Paste the client ID and secret into **Admin → Google** (stored encrypted), or set `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` in `.env`.
+6. Until Google verifies the app, only test users you add under Audience (max 100) can connect. Submit for verification before launch: contacts and calendar are "sensitive" scopes, so Google reviews the privacy policy and a short demo video (usually a few days to a few weeks; no paid security audit is needed for these scopes).
+
+The scheduler cron runs `giftnify:google-sync` daily at 03:30 to keep calendars current. The Android app opens Google's sign-in in the phone's browser (Google blocks sign-in inside apps); people return to the app and it refreshes.

@@ -79,6 +79,24 @@ class AdminController extends Controller
         return Inertia::render('Admin/PaymentSettings', ['settings' => \App\Services\PaymentSettings::status()]);
     }
 
+    public function googleSettings(Request $request): Response
+    {
+        abort_unless($request->user()->isAdmin(), 403);
+        return Inertia::render('Admin/GoogleSettings', ['settings' => \App\Services\GoogleSettings::status()]);
+    }
+
+    public function saveGoogleSettings(Request $request)
+    {
+        abort_unless($request->user()->isAdmin(), 403);
+        $v = $request->validate(['keys' => 'array', 'keys.*' => 'nullable|string|max:300', 'clear' => 'array', 'clear.*' => 'string']);
+        $errors = \App\Services\GoogleSettings::save($v['keys'] ?? [], $v['clear'] ?? []);
+        if ($errors) {
+            return back()->withErrors(collect($errors)->mapWithKeys(fn ($m, $k) => ["keys.{$k}" => $m])->all());
+        }
+        AuditLog::record('settings.google_updated', 'google_keys', ['changed' => array_keys(array_filter($v['keys'] ?? [])), 'cleared' => $v['clear'] ?? []]);
+        return back()->with('success', 'Google settings saved.');
+    }
+
     public function savePaymentSettings(Request $request)
     {
         abort_unless($request->user()->isAdmin(), 403);

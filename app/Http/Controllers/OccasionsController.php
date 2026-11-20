@@ -20,6 +20,7 @@ class OccasionsController extends Controller
             'settings' => $user ? BirthdayBook::settings($user) : null,
             'welcome' => $request->boolean('welcome'),
             'leads' => BirthdayBook::LEADS,
+            'google' => GoogleController::statusFor($user),
         ]);
     }
 
@@ -34,6 +35,7 @@ class OccasionsController extends Controller
         ]);
 
         $request->user()->contacts()->create($validated + ['source' => 'manual']);
+        \App\Services\GoogleService::queueSync($request->user());
         return back()->with('success', 'Saved. We\'ll remind you before their day.');
     }
 
@@ -42,6 +44,7 @@ class OccasionsController extends Controller
     {
         $v = $request->validate(BirthdayBook::IMPORT_RULES);
         $r = BirthdayBook::import($request->user(), $v['contacts'], $v['source'] ?? 'phone');
+        if ($r['added']) \App\Services\GoogleService::queueSync($request->user());
         if ($request->expectsJson() && !$request->header('X-Inertia')) return response()->json($r);
         return back()->with('success', "Added {$r['added']} " . ($r['added'] === 1 ? 'person' : 'people') . '.');
     }
@@ -72,6 +75,7 @@ class OccasionsController extends Controller
     {
         $contact = $request->user()->contacts()->findOrFail($id);
         $contact->delete();
+        \App\Services\GoogleService::queueSync($request->user());
         return back()->with('success', 'Removed.');
     }
 }

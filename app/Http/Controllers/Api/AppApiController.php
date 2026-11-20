@@ -218,7 +218,9 @@ class AppApiController extends Controller
     public function importContacts(Request $request): JsonResponse
     {
         $v = $request->validate(\App\Services\BirthdayBook::IMPORT_RULES);
-        return response()->json(\App\Services\BirthdayBook::import($request->user(), $v['contacts'], $v['source'] ?? 'phone'));
+        $r = \App\Services\BirthdayBook::import($request->user(), $v['contacts'], $v['source'] ?? 'phone');
+        if ($r['added']) \App\Services\GoogleService::queueSync($request->user());
+        return response()->json($r);
     }
 
     public function storeContact(Request $request): JsonResponse
@@ -231,12 +233,14 @@ class AppApiController extends Controller
             'occasion_date' => 'nullable|date',
         ]);
         $c = $request->user()->contacts()->create($v + ['source' => 'manual']);
+        \App\Services\GoogleService::queueSync($request->user());
         return response()->json(\App\Services\BirthdayBook::people($request->user())->firstWhere('id', $c->id), 201);
     }
 
     public function destroyContact(Request $request, string $id): JsonResponse
     {
         $request->user()->contacts()->findOrFail($id)->delete();
+        \App\Services\GoogleService::queueSync($request->user());
         return response()->json(['ok' => true]);
     }
 

@@ -3,7 +3,8 @@ import React, { ReactNode, useEffect } from 'react';
 import { Link, usePage } from '@inertiajs/react';
 import { 
   Shield, Gift, CreditCard, Tag, Landmark, KeyRound, 
-  ArrowLeft, LogOut, LayoutDashboard, Sparkles, Wallet 
+  ArrowLeft, LogOut, LayoutDashboard, Sparkles, Wallet,
+  CalendarDays,
 } from 'lucide-react';
 import { Icon3D } from '../Components/Icon3D';
 
@@ -34,6 +35,7 @@ export const AdminLayout: React.FC<Props> = ({ children, title }) => {
     { label: 'Wallet Withdrawals', href: '/admin/withdrawals', icon: Wallet },
     { label: 'Promo Codes', href: '/admin/promos', icon: Tag },
     { label: 'Payment Settings', href: '/admin/settings/payments', icon: KeyRound },
+    { label: 'Google', href: '/admin/settings/google', icon: CalendarDays },
   ];
 
   return (

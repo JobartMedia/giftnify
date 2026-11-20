@@ -41,6 +41,12 @@ return [
     // Front ends allowed to use the API and receive payment redirects (the app). Comma-separated origins.
     'app_clients' => array_values(array_unique(array_merge(array_filter(array_map('trim', explode(',', env('APP_CLIENT_URLS', 'http://localhost:3000,http://127.0.0.1:3000')))), ['https://localhost', 'capacitor://localhost']))),
 
+    // Google Contacts + Calendar for birthday reminders. Keys can also be entered in Admin → Google.
+    'google' => [
+        'client_id' => env('GOOGLE_CLIENT_ID'),
+        'client_secret' => env('GOOGLE_CLIENT_SECRET'),
+    ],
+
     'ai' => [
         'key' => env('OPENAI_API_KEY') ?: env('LOVABLE_API_KEY'),
     ],

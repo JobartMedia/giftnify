@@ -3,6 +3,7 @@ import { Head, Link, router } from '@inertiajs/react';
 import { AppLayout } from '../../Layouts/AppLayout';
 import { Icon3D } from '../../Components/Icon3D';
 import { ContactImport, type PhoneContact, type ImportSource } from '../../Components/contacts/ContactImport';
+import { GoogleConnect, type GoogleStatus } from '../../Components/contacts/GoogleConnect';
 import { Bell, CalendarClock, Cake, Gift, Plus, Sparkles, Trash2, UserCheck } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -36,7 +37,15 @@ function Face({ p, size = 48 }: { p: Person; size?: number }) {
     : <span className="grid shrink-0 place-items-center rounded-2xl bg-petal font-display font-extrabold text-[#E5007D]" style={{ width: size, height: size, fontSize: size * 0.4 }}>{p.name.charAt(0)}</span>;
 }
 
-export default function Occasions({ people = [], settings, welcome, leads = [7, 1] }: { people: Person[]; settings: Settings | null; welcome?: boolean; leads?: number[] }) {
+async function gjson(url: string, init: RequestInit = {}) {
+  const res = await fetch(url, { credentials: 'same-origin', ...init, headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...csrfHeaders(), ...(init.headers || {}) } });
+  const d = await res.json().catch(() => ({}));
+  return { res, d };
+}
+
+export default function Occasions({ people = [], settings, welcome, leads = [7, 1], google: googleInitial }: { people: Person[]; settings: Settings | null; welcome?: boolean; leads?: number[]; google?: GoogleStatus }) {
+  const [google, setGoogle] = useState<GoogleStatus>(googleInitial ?? { available: false, connected: false });
+  const justConnected = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('google') === 'contacts';
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState({ name: '', phone: '', email: '', occasion: 'Birthday', day: 0, month: 0 });
   const [range, setRange] = useState<'month' | 'all'>('month');
@@ -180,7 +189,36 @@ export default function Occasions({ people = [], settings, welcome, leads = [7, 
           )}
         </section>
 
-        <ContactImport save={importRows} />
+        <GoogleConnect
+          status={google}
+          onConnect={(want) => { window.location.href = `/integrations/google/connect?want=${want}`; }}
+          onCalendar={async (enabled) => {
+            const { res, d } = await gjson('/integrations/google/calendar', { method: 'POST', body: JSON.stringify({ enabled }) });
+            if (res.status === 409 && d.needs_connect) { window.location.href = '/integrations/google/connect?want=calendar'; return; }
+            if (d.available !== undefined) setGoogle(d);
+            if (!res.ok) toast.error(d.message || 'Google Calendar didn\'t respond.'); else toast.success(enabled ? 'Birthdays added to your Google Calendar' : 'Giftnify Birthdays calendar removed');
+          }}
+          onSync={async () => {
+            const { res, d } = await gjson('/integrations/google/sync', { method: 'POST' });
+            if (d.available !== undefined) setGoogle(d);
+            if (!res.ok) toast.error(d.message || 'Google Calendar didn\'t respond.'); else toast.success('Calendar updated');
+          }}
+          onDisconnect={async () => {
+            const { d } = await gjson('/integrations/google', { method: 'DELETE' });
+            if (d.available !== undefined) setGoogle(d);
+            toast.success('Google disconnected');
+          }}
+        />
+
+        <ContactImport
+          save={importRows}
+          autoGoogle={justConnected}
+          google={google.connected && google.contacts ? async () => {
+            const { res, d } = await gjson('/integrations/google/contacts');
+            if (!res.ok) throw new Error(d.message || 'Google Contacts didn\'t respond.');
+            return d.contacts as PhoneContact[];
+          } : null}
+        />
 
         {/* Everyone */}
         {people.length > 0 && (

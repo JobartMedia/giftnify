@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Cake, Check, FileUp, Loader2, Search, Smartphone, X } from 'lucide-react';
 
 /**
@@ -11,13 +11,28 @@ import { Cake, Check, FileUp, Loader2, Search, Smartphone, X } from 'lucide-reac
  */
 
 export interface PhoneContact { name: string; phone?: string | null; email?: string | null; birth_day?: number | null; birth_month?: number | null }
-export type ImportSource = 'phone' | 'vcard';
+export type ImportSource = 'phone' | 'vcard' | 'google';
 
 interface Props {
   save: (rows: PhoneContact[], source: ImportSource) => Promise<{ added: number; skipped: number } | { error: string }>;
   /** The app passes its native contacts reader; the website uses the browser's contact picker when there is one. */
   native?: (() => Promise<PhoneContact[] | null>) | null;
+  /** When Google Contacts is connected: loads them for the same tick list. */
+  google?: (() => Promise<PhoneContact[]>) | null;
+  /** Open the Google list straight away (just came back from connecting). */
+  autoGoogle?: boolean;
   onDone?: (added: number) => void;
+}
+
+export function GoogleMark({ className = 'size-5' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 48 48" className={className} aria-hidden>
+      <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z" />
+      <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3 0 5.8 1.1 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z" />
+      <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.3 0-9.7-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z" />
+      <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z" />
+    </svg>
+  );
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -58,7 +73,7 @@ const browserPicker = (): BrowserContacts | null => {
   return c && typeof c.select === 'function' ? c : null;
 };
 
-export function ContactImport({ save, native, onDone }: Props) {
+export function ContactImport({ save, native, google, autoGoogle, onDone }: Props) {
   const [rows, setRows] = useState<PhoneContact[] | null>(null);
   const [source, setSource] = useState<ImportSource>('phone');
   const [picked, setPicked] = useState<Set<number>>(new Set());
@@ -97,6 +112,19 @@ export function ContactImport({ save, native, onDone }: Props) {
       setMsg({ tone: 'err', text: "We couldn't open your contacts. Try the contacts file instead." });
     } finally { setBusy(null); }
   };
+
+  const fromGoogle = async () => {
+    if (!google) return;
+    setMsg(null); setBusy('reading');
+    try { load(await google(), 'google'); }
+    catch (e) { setMsg({ tone: 'err', text: e instanceof Error && e.message ? e.message : "Google Contacts didn't respond. Try again." }); }
+    finally { setBusy(null); }
+  };
+  const autoRan = useRef(false);
+  useEffect(() => {
+    if (autoGoogle && google && !autoRan.current) { autoRan.current = true; void fromGoogle(); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoGoogle, google]);
 
   const fromFile = async (f: File | undefined) => {
     if (!f) return;
@@ -184,6 +212,11 @@ export function ContactImport({ save, native, onDone }: Props) {
       <p className="font-display text-lg font-extrabold text-ink">Add people from your contacts</p>
       <p className="mt-1 text-sm text-ink-soft">We'll remind you before their birthdays. Friends already on Giftnify bring their birthday with them.</p>
       <div className="mt-4 grid gap-2.5 sm:grid-cols-2">
+        {google && (
+          <button type="button" onClick={fromGoogle} disabled={!!busy} className={`${btn} border border-line bg-white text-ink hover:bg-petal sm:col-span-2`}>
+            {busy === 'reading' ? <Loader2 className="size-5 animate-spin" aria-hidden /> : <GoogleMark />} Import from Google Contacts
+          </button>
+        )}
         {canPhone && (
           <button type="button" onClick={fromPhone} disabled={!!busy} className={`${btn} bg-gradient-primary text-white shadow-glow`}>
             {busy === 'reading' ? <Loader2 className="size-5 animate-spin" aria-hidden /> : <Smartphone className="size-5" aria-hidden />} Add from my phone

@@ -76,6 +76,27 @@ Artisan::command('giftnify:birthday-reminders', function () {
                     ->reject(fn ($p) => \DB::table('birthday_reminder_log')->where('contact_id', $p['id'])
                         ->where('occurs_on', $p['next_date'])->where('lead_days', $p['days'])->exists())
                     ->values();
+                // Follow-up: their day was yesterday and no gift went out. A belated surprise still lands.
+                $missed = \App\Services\BirthdayBook::missedYesterday($user)
+                    ->reject(fn ($p) => \DB::table('birthday_reminder_log')->where('contact_id', $p['id'])
+                        ->where('occurs_on', $today->subDay()->format('Y-m-d'))->where('lead_days', \App\Services\BirthdayBook::FOLLOW_UP)->exists())
+                    ->values();
+                foreach ($missed as $p) {
+                    try {
+                        \App\Services\DeliveryService::sendEmail($user->email, "Did you celebrate {$p['first']} yesterday?", 'emails.birthday-followup', [
+                            'name' => explode(' ', trim($user->name))[0], 'person' => $p,
+                            'link' => \App\Services\BirthdayBook::giftLink($p, false), 'settings' => url('/occasions#settings'),
+                        ]);
+                        \DB::table('birthday_reminder_log')->insertOrIgnore([
+                            'user_id' => $user->id, 'contact_id' => $p['id'], 'occurs_on' => $today->subDay()->format('Y-m-d'),
+                            'lead_days' => \App\Services\BirthdayBook::FOLLOW_UP, 'sent_at' => now(),
+                        ]);
+                        $sent++;
+                    } catch (\Throwable $e) {
+                        report($e);
+                    }
+                }
+
                 if ($due->isEmpty()) continue;
 
                 $people = $due->map(fn ($p) => $p + [
@@ -110,3 +131,25 @@ Artisan::command('giftnify:birthday-reminders', function () {
 
 \Illuminate\Support\Facades\Schedule::command('giftnify:birthday-reminders')
     ->dailyAt('08:00')->timezone('Africa/Lagos')->withoutOverlapping();
+
+/*
+ | Google Calendar: once a day, bring each connected "Giftnify Birthdays"
+ | calendar up to date (friends who joined, birthdays they shared).
+ */
+Artisan::command('giftnify:google-sync', function () {
+    if (!\App\Services\GoogleSettings::configured()) return $this->info('Google is not set up.');
+    $done = 0;
+    \App\Models\GoogleConnection::where('calendar_enabled', true)->with('user')->chunkById(100, function ($conns) use (&$done) {
+        foreach ($conns as $conn) {
+            try {
+                \App\Services\GoogleService::syncCalendar($conn);
+                $done++;
+            } catch (\Throwable $e) {
+                $conn->update(['last_error' => mb_substr($e->getMessage(), 0, 300)]);
+            }
+        }
+    });
+    $this->info("Synced {$done} Google calendar(s).");
+})->purpose('Keep Giftnify Birthdays calendars in Google up to date');
+
+\Illuminate\Support\Facades\Schedule::command('giftnify:google-sync')->dailyAt('03:30')->timezone('Africa/Lagos')->withoutOverlapping();

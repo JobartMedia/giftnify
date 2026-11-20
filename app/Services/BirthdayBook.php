@@ -18,6 +18,8 @@ class BirthdayBook
     public const TZ = 'Africa/Lagos';
     /** Reminder emails go out this many days before. */
     public const LEADS = [7, 1];
+    /** Logged as the "lead" for the day-after follow-up. */
+    public const FOLLOW_UP = 99;
 
     /** Last 10 digits: "0803 555 0142", "+234 803 555 0142" and "2348035550142" all match. */
     public static function phoneKey(?string $phone): ?string
@@ -100,6 +102,24 @@ class BirthdayBook
         return $date;
     }
 
+    /** People whose day was yesterday, and the owner hasn't sent them a gift around it. */
+    public static function missedYesterday(User $owner): Collection
+    {
+        $yesterday = CarbonImmutable::now(self::TZ)->startOfDay()->subDay();
+        return self::people($owner, $yesterday)->filter(fn ($p) => $p['days'] === 0)
+            ->reject(function ($p) use ($owner, $yesterday) {
+                $key = self::phoneKey($p['phone']);
+                return \App\Models\Gift::where('sender_id', $owner->id)
+                    ->whereNotIn('status', ['Awaiting Payment', 'Cancelled', 'Refunded'])
+                    ->where('created_at', '>=', $yesterday->subDays(14)->utc())
+                    ->where(function ($q) use ($p, $key) {
+                        if ($p['email']) $q->orWhere(\DB::raw('lower(recipient_contact)'), strtolower($p['email']));
+                        if ($key) $q->orWhere('recipient_contact', 'like', '%' . substr($key, -9));
+                        if (!$p['email'] && !$key) $q->whereRaw('1 = 0');
+                    })->exists();
+            })->values();
+    }
+
     /** Link to start a gift for this person, set to open at midnight on the day. */
     public static function giftLink(array $p, bool $scheduled = true): string
     {
@@ -120,7 +140,7 @@ class BirthdayBook
         'contacts.*.email' => 'nullable|email|max:120',
         'contacts.*.birth_day' => 'nullable|integer|min:1|max:31',
         'contacts.*.birth_month' => 'nullable|integer|min:1|max:12',
-        'source' => 'nullable|in:phone,vcard,manual',
+        'source' => 'nullable|in:phone,vcard,manual,google',
     ];
 
     /**

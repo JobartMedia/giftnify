@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Me } from "./api";
 import type { PhoneContact } from "@/components/giftnify/contacts/ContactImport";
+import type { GoogleStatus } from "@/components/giftnify/contacts/GoogleConnect";
 import { useMe } from "./auth";
 
 export interface Contact {
@@ -56,8 +57,20 @@ export function useContacts() {
 }
 
 /** Add many people at once (from the phone or a .vcf file). */
-export const importContacts = (contacts: PhoneContact[], source: "phone" | "vcard") =>
+export const importContacts = (contacts: PhoneContact[], source: "phone" | "vcard" | "google") =>
   api<{ added: number; skipped: number }>("/contacts/import", { body: { contacts, source } });
+
+/** Google Contacts + Calendar. */
+export const googleStatus = () => api<GoogleStatus>("/integrations/google");
+/** Opens Google's sign-in in the phone's browser (Google doesn't allow it inside apps). */
+export async function connectGoogle(want: "both" | "contacts" | "calendar") {
+  const { url } = await api<{ url: string }>("/integrations/google/link", { body: { want } });
+  window.location.href = url;
+}
+export const googleContacts = async () => (await api<{ contacts: PhoneContact[] }>("/integrations/google/contacts")).contacts;
+export const googleCalendar = (enabled: boolean) => api<GoogleStatus>("/integrations/google/calendar", { body: { enabled } });
+export const googleSync = () => api<GoogleStatus>("/integrations/google/sync", { method: "POST" });
+export const googleDisconnect = () => api<GoogleStatus>("/integrations/google", { method: "DELETE" });
 
 /** Reminder settings and who can see my birthday. */
 export const updateBirthdaySettings = (v: { birthday_visible?: boolean; birthday_reminders?: boolean }) =>

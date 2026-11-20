@@ -43,6 +43,10 @@ Route::post('/gift/verify-bank', [RedemptionController::class, 'verifyBank'])->n
 Route::get('/@{username}', [\App\Http\Controllers\CreatorController::class, 'show'])
     ->where('username', '[A-Za-z0-9_]{3,30}')->name('creator.show');
 
+// Google Contacts + Calendar
+Route::get('/integrations/google/callback', [\App\Http\Controllers\GoogleController::class, 'callback'])->name('google.callback');
+Route::get('/integrations/google/app/{user}', [\App\Http\Controllers\GoogleController::class, 'appStart'])->middleware('signed')->name('google.app-start');
+
 // Birthday leaderboard (public board; your rank needs sign-in)
 Route::get('/leaderboard', [\App\Http\Controllers\LeaderboardController::class, 'index'])->name('leaderboard');
 
@@ -90,6 +94,12 @@ Route::middleware('auth')->group(function () {
     Route::post('/gift/{token}/claim', [WalletController::class, 'claim'])->name('wallet.claim');
     Route::post('/occasions/contacts', [OccasionsController::class, 'storeContact'])->name('contacts.store');
     Route::post('/occasions/contacts/import', [OccasionsController::class, 'import'])->middleware('throttle:10,1')->name('contacts.import');
+    Route::get('/integrations/google/connect', [\App\Http\Controllers\GoogleController::class, 'connect'])->name('google.connect');
+    Route::get('/integrations/google/contacts', [\App\Http\Controllers\GoogleController::class, 'contacts'])->middleware('throttle:10,1');
+    Route::post('/integrations/google/calendar', [\App\Http\Controllers\GoogleController::class, 'calendar'])->middleware('throttle:10,1');
+    Route::post('/integrations/google/sync', [\App\Http\Controllers\GoogleController::class, 'sync'])->middleware('throttle:6,1');
+    Route::delete('/integrations/google', [\App\Http\Controllers\GoogleController::class, 'disconnect']);
+    Route::get('/occasions/gift/{contact}', [\App\Http\Controllers\GoogleController::class, 'gift'])->name('occasions.gift');
     Route::post('/occasions/settings', [OccasionsController::class, 'settings'])->name('occasions.settings');
     Route::delete('/occasions/contacts/{id}', [OccasionsController::class, 'destroyContact'])->name('contacts.destroy');
 
@@ -101,6 +111,8 @@ Route::middleware('auth')->group(function () {
         Route::get('/payments', [AdminController::class, 'payments'])->name('payments');
         Route::get('/settings/payments', [AdminController::class, 'paymentSettings'])->name('settings.payments');
         Route::post('/settings/payments', [AdminController::class, 'savePaymentSettings'])->name('settings.payments.save');
+        Route::get('/settings/google', [AdminController::class, 'googleSettings'])->name('settings.google');
+        Route::post('/settings/google', [AdminController::class, 'saveGoogleSettings'])->name('settings.google.save');
         Route::post('/settings/payments/check', [AdminController::class, 'checkPaystack'])->middleware('throttle:10,1')->name('settings.payments.check');
         Route::get('/promos', [AdminController::class, 'promos'])->name('promos');
         Route::post('/promos', [AdminController::class, 'storePromo'])->name('promos.store');

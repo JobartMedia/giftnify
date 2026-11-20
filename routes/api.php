@@ -66,6 +66,12 @@ Route::prefix('v1')->name('api.v1.')->middleware(OptionalApiUser::class)->group(
         Route::post('/me/birthday', [\App\Http\Controllers\LeaderboardController::class, 'birthday'])->middleware('throttle:20,1');
         Route::get('/contacts', [AppApiController::class, 'contacts']);
         Route::post('/contacts', [AppApiController::class, 'storeContact']);
+        Route::get('/integrations/google', [\App\Http\Controllers\GoogleController::class, 'status']);
+        Route::post('/integrations/google/link', [\App\Http\Controllers\GoogleController::class, 'appLink'])->middleware('throttle:10,1');
+        Route::get('/integrations/google/contacts', [\App\Http\Controllers\GoogleController::class, 'contacts'])->middleware('throttle:10,1');
+        Route::post('/integrations/google/calendar', [\App\Http\Controllers\GoogleController::class, 'calendar'])->middleware('throttle:10,1');
+        Route::post('/integrations/google/sync', [\App\Http\Controllers\GoogleController::class, 'sync'])->middleware('throttle:6,1');
+        Route::delete('/integrations/google', [\App\Http\Controllers\GoogleController::class, 'disconnect']);
         Route::post('/contacts/import', [AppApiController::class, 'importContacts'])->middleware('throttle:10,1');
         Route::delete('/contacts/{id}', [AppApiController::class, 'destroyContact']);
     });

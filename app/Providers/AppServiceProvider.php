@@ -34,5 +34,6 @@ class AppServiceProvider extends ServiceProvider
 
         // Payment keys saved in the staff console override .env.
         \App\Services\PaymentSettings::apply();
+        \App\Services\GoogleSettings::apply();
     }
 }
