@@ -202,7 +202,7 @@ class GiftFlowTest extends TestCase
 
     public function test_signing_up_never_creates_an_admin(): void
     {
-        $this->post('/register', ['name' => 'First Person', 'email' => 'first@example.com', 'password' => 'a-long-password', 'password_confirmation' => 'a-long-password']);
+        $this->post('/register', ['name' => 'First Person', 'email' => 'first@example.com', 'password' => 'a-long-password', 'password_confirmation' => 'a-long-password', 'birth_day' => 3, 'birth_month' => 5]);
         $this->assertSame('user', User::where('email', 'first@example.com')->value('role'));
     }
 

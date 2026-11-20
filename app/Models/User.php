@@ -26,6 +26,8 @@ class User extends Authenticatable
         'birth_day',
         'birthday_set_at',
         'leaderboard_opt_in',
+        'birthday_visible',
+        'birthday_reminders',
         'city',
         'country',
         'bio',
@@ -52,7 +54,16 @@ class User extends Authenticatable
             'birth_day' => 'integer',
             'birthday_set_at' => 'datetime',
             'leaderboard_opt_in' => 'boolean',
+            'birthday_visible' => 'boolean',
+            'birthday_reminders' => 'boolean',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::saving(function (User $u) {
+            if ($u->isDirty('phone')) $u->phone_key = \App\Services\BirthdayBook::phoneKey($u->phone);
+        });
     }
 
     public function gifts()

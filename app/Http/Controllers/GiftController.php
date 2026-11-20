@@ -51,6 +51,9 @@ class GiftController extends Controller
                 'type' => $request->query('type'),
                 'amount' => $request->query('amount') ? max(1, (float)$request->query('amount')) : null,
                 'mode' => in_array($request->query('mode'), ['classic', 'guess', 'anonymous'], true) ? $request->query('mode') : null,
+                // From a birthday reminder: who to send to, and the day it should open.
+                'contact' => is_string($request->query('contact')) ? mb_substr($request->query('contact'), 0, 120) : null,
+                'opens' => is_string($request->query('opens')) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $request->query('opens')) ? $request->query('opens') : null,
             ],
         ]);
     }

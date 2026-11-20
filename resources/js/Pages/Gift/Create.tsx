@@ -33,8 +33,11 @@ export default function Create({ contacts, preselected, creator }: any) {
   const [recipientName, setRecipientName] = useState(creator ? creator.name : (preselected?.to || ''));
   // Only channels that can really deliver right now (set up on the server)
   const channels: string[] = cms?.delivery_channels?.length ? cms.delivery_channels : ['Link'];
-  const [delivery, setDelivery] = useState(channels[0]);
-  const [contact, setContact] = useState('');
+  // From a birthday reminder: reach them the way we know how.
+  const pre = String(preselected?.contact || '');
+  const preChannel = pre.includes('@') ? 'Email' : pre ? (channels.includes('WhatsApp') ? 'WhatsApp' : 'SMS') : '';
+  const [delivery, setDelivery] = useState(channels.includes(preChannel) ? preChannel : channels[0]);
+  const [contact, setContact] = useState(channels.includes(preChannel) ? pre : '');
   const [occasion, setOccasion] = useState(preselected?.occasion || (creator ? 'Just Because' : 'Birthday'));
 
   // How the mystery plays out
@@ -42,8 +45,9 @@ export default function Create({ contacts, preselected, creator }: any) {
   const [guessHints, setGuessHints] = useState<string[]>(['', '', '']);
   const [guessNames, setGuessNames] = useState('');
   const [valueTeaser, setValueTeaser] = useState<'mystery' | 'figures'>('mystery');
-  const [schedule, setSchedule] = useState<'now' | 'later'>('now');
-  const [unlockLocal, setUnlockLocal] = useState(nextMidnightLocal());
+  const opensAt = preselected?.opens && new Date(`${preselected.opens}T00:00`).getTime() > Date.now() + 10 * 60_000 ? `${preselected.opens}T00:00` : null;
+  const [schedule, setSchedule] = useState<'now' | 'later'>(opensAt ? 'later' : 'now');
+  const [unlockLocal, setUnlockLocal] = useState(opensAt || nextMidnightLocal());
   // Creator link extras
   const [wallNote, setWallNote] = useState('');
   const [onWall, setOnWall] = useState(true);

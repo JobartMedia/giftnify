@@ -128,7 +128,10 @@ export interface Me {
   preferred_currency: string | null;
   wallets: { currency: string; balance: number }[];
   gifts_sent: number;
+  birthday?: { birth_day: number | null; birth_month: number | null; birthday_locked: boolean; birthday_visible: boolean; birthday_reminders: boolean; phone: string | null };
 }
+
+export interface SignUpExtras { name?: string; phone?: string; birth_day?: number; birth_month?: number; birthday_visible?: boolean }
 
 type AuthEvent = "SIGNED_IN" | "SIGNED_OUT";
 const listeners = new Set<(e: AuthEvent) => void>();
@@ -158,8 +161,8 @@ export async function signIn(email: string, password: string) {
   return r.user;
 }
 
-export async function signUp(email: string, password: string, name?: string) {
-  const r = await api<{ token: string; user: Me }>("/auth/register", { body: { email, password, ...(name ? { name } : {}) } });
+export async function signUp(email: string, password: string, extras: SignUpExtras = {}) {
+  const r = await api<{ token: string; user: Me }>("/auth/register", { body: { email, password, ...extras } });
   setToken(r.token);
   return r.user;
 }

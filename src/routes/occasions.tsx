@@ -5,7 +5,10 @@ import { toast } from "sonner";
 import { AppShell, Avatar, Btn, Card, Chip, Field, PageHeader } from "@/components/giftnify/ui";
 import { Icon3D } from "@/components/giftnify/Icon3D";
 import { ApiError } from "@/lib/api";
-import { useContacts, initialsOf, saveContact, deleteContact } from "@/lib/contacts";
+import { useContacts, initialsOf, saveContact, deleteContact, importContacts, readPhoneContacts, updateBirthdaySettings } from "@/lib/contacts";
+import { ContactImport } from "@/components/giftnify/contacts/ContactImport";
+import { useMe } from "@/lib/auth";
+import { Capacitor } from "@capacitor/core";
 import { useContent } from "@/lib/content";
 
 export const Route = createFileRoute("/occasions")({
@@ -31,7 +34,12 @@ function Occasions() {
 
   const shown = reminders.filter((r) => (tab === "Today" ? r.days === 0 : tab === "This Week" ? r.days < 7 : true));
   const featured = reminders[0];
-  const undated = contacts.filter((c) => !c.occasion_date);
+  const undated = contacts.filter((c) => !c.remind_date && !c.occasion_date);
+  const { me, refresh: refreshMe } = useMe();
+  const isApp = typeof window !== "undefined" && Capacitor.isNativePlatform();
+  const setPref = async (v: { birthday_visible?: boolean; birthday_reminders?: boolean }) => {
+    try { await updateBirthdaySettings(v); refreshMe(); toast.success("Saved"); } catch { toast.error("Couldn't save. Try again."); }
+  };
 
   async function add(e: React.FormEvent) {
     e.preventDefault();
@@ -90,7 +98,7 @@ function Occasions() {
             {shown.map((c) => (
               <Card key={c.id} className="flex items-center gap-3 p-4">
                 <Avatar initials={c.initials} />
-                <div className="min-w-0 flex-1"><p className="truncate font-bold">{c.name}</p><p className="text-sm text-muted-foreground">{c.occasion} – {c.when}</p></div>
+                <div className="min-w-0 flex-1"><p className="truncate font-bold">{c.name}{c.on_giftnify && <span className="ml-1.5 rounded-full bg-secondary px-2 py-0.5 align-middle text-[10px] font-bold text-secondary-foreground">On Giftnify</span>}</p><p className="text-sm text-muted-foreground">{c.occasion} · {c.date_label ?? ""} – {c.when}</p></div>
                 <Link to="/create" search={{ to: c.name, occasion: c.occasion }} className="rounded-full bg-secondary px-4 py-2 text-sm font-bold text-secondary-foreground">Gift</Link>
                 <button onClick={() => remove(c.id)} aria-label={`Remove ${c.name}`} className="text-muted-foreground"><Trash2 className="size-4" /></button>
               </Card>
@@ -98,11 +106,40 @@ function Occasions() {
             {tab === "Upcoming" && undated.map((c) => (
               <Card key={c.id} className="flex items-center gap-3 p-4">
                 <Avatar initials={initialsOf(c.name)} />
-                <div className="min-w-0 flex-1"><p className="truncate font-bold">{c.name}</p><p className="text-sm text-muted-foreground">No date saved</p></div>
+                <div className="min-w-0 flex-1"><p className="truncate font-bold">{c.name}</p><p className="text-sm text-muted-foreground">{c.on_giftnify ? "On Giftnify · birthday not shared" : "No date saved"}</p></div>
                 <button onClick={() => remove(c.id)} aria-label={`Remove ${c.name}`} className="text-muted-foreground"><Trash2 className="size-4" /></button>
               </Card>
             ))}
           </div>
+
+          <div className="mt-6">
+            <ContactImport
+              native={isApp ? readPhoneContacts : null}
+              save={async (rows, source) => {
+                try { const r = await importContacts(rows, source); refresh(); return r; }
+                catch (err) { return { error: err instanceof ApiError ? err.message : "Couldn't save. Try again." }; }
+              }}
+            />
+          </div>
+
+          {me?.birthday && (
+            <Card className="mt-6 space-y-4">
+              <h2 className="font-extrabold">Reminder settings</h2>
+              {me.birthday.birth_month ? (
+                <p className="text-sm">🎂 Your birthday: <b>{me.birthday.birth_day} {["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][me.birthday.birth_month - 1]}</b></p>
+              ) : (
+                <Link to="/leaderboard" className="block rounded-2xl bg-blush p-3 text-sm font-bold">🎂 Add your birthday so friends get reminded too →</Link>
+              )}
+              <label className="flex items-start gap-3 text-sm">
+                <input type="checkbox" defaultChecked={me.birthday.birthday_reminders} onChange={(e) => setPref({ birthday_reminders: e.target.checked })} className="mt-0.5 size-5 accent-[var(--primary)]" />
+                <span><b>Email me before birthdays</b><br /><span className="text-muted-foreground">7 days before and the day before.</span></span>
+              </label>
+              <label className="flex items-start gap-3 text-sm">
+                <input type="checkbox" defaultChecked={me.birthday.birthday_visible} onChange={(e) => setPref({ birthday_visible: e.target.checked })} className="mt-0.5 size-5 accent-[var(--primary)]" />
+                <span><b>Let people who have my number or email see my birthday</b><br /><span className="text-muted-foreground">Day and month only.</span></span>
+              </label>
+            </Card>
+          )}
         </>
       )}
     </AppShell>

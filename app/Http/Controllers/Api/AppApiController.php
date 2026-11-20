@@ -37,7 +37,14 @@ class AppApiController extends Controller
             'name' => 'nullable|string|max:80',
             'email' => 'required|string|email|max:255|unique:users,email',
             'password' => ['required', PasswordRule::min(8)],
+            'phone' => 'nullable|string|max:40',
+            'birth_day' => 'nullable|required_with:birth_month|integer|min:1|max:31',
+            'birth_month' => 'nullable|required_with:birth_day|integer|min:1|max:12',
+            'birthday_visible' => 'boolean',
         ]);
+        if (!empty($v['birth_month']) && !checkdate((int)$v['birth_month'], (int)$v['birth_day'], 2000)) {
+            return response()->json(['message' => 'That birthday does not exist.', 'errors' => ['birth_day' => ['That birthday does not exist.']]], 422);
+        }
 
         $email = strtolower($v['email']);
         $user = User::create([
@@ -45,7 +52,10 @@ class AppApiController extends Controller
             'email' => $email,
             'password' => Hash::make($v['password']),
             'role' => 'user',
-        ]);
+            'phone' => trim((string)($v['phone'] ?? '')) ?: null,
+            'birthday_visible' => (bool)($v['birthday_visible'] ?? true),
+            'country' => 'NG',
+        ] + \App\Services\BirthdayBook::birthdayFromRequest($v));
 
         return response()->json(['token' => $this->token($user, $request), 'user' => $this->me($user)], 201);
     }
@@ -105,6 +115,8 @@ class AppApiController extends Controller
             'name' => 'sometimes|string|min:2|max:80',
             'phone' => 'sometimes|nullable|string|max:40',
             'preferred_currency' => 'sometimes|string|in:' . implode(',', array_keys((array)config('services.payments.routes'))),
+            'birthday_visible' => 'sometimes|boolean',
+            'birthday_reminders' => 'sometimes|boolean',
         ]);
         $request->user()->update($v);
         return response()->json($this->me($request->user()->fresh()));
@@ -199,9 +211,14 @@ class AppApiController extends Controller
 
     public function contacts(Request $request): JsonResponse
     {
-        return response()->json(Contact::where('user_id', $request->user()->id)->orderBy('name')
-            ->get(['id', 'name', 'phone', 'email', 'occasion', 'occasion_date'])
-            ->map(fn ($c) => [...$c->toArray(), 'occasion_date' => $c->occasion_date?->format('Y-m-d')]));
+        return response()->json(\App\Services\BirthdayBook::people($request->user())->values());
+    }
+
+    /** Add many people at once, from the phone's contacts or a contacts file. */
+    public function importContacts(Request $request): JsonResponse
+    {
+        $v = $request->validate(\App\Services\BirthdayBook::IMPORT_RULES);
+        return response()->json(\App\Services\BirthdayBook::import($request->user(), $v['contacts'], $v['source'] ?? 'phone'));
     }
 
     public function storeContact(Request $request): JsonResponse
@@ -213,8 +230,8 @@ class AppApiController extends Controller
             'occasion' => 'nullable|string|max:50',
             'occasion_date' => 'nullable|date',
         ]);
-        $c = $request->user()->contacts()->create($v);
-        return response()->json([...$c->toArray(), 'occasion_date' => $c->occasion_date?->format('Y-m-d')], 201);
+        $c = $request->user()->contacts()->create($v + ['source' => 'manual']);
+        return response()->json(\App\Services\BirthdayBook::people($request->user())->firstWhere('id', $c->id), 201);
     }
 
     public function destroyContact(Request $request, string $id): JsonResponse
@@ -271,6 +288,7 @@ class AppApiController extends Controller
             'role' => $user->role,
             'is_staff' => $user->isStaff(),
             'preferred_currency' => $user->preferred_currency,
+            'birthday' => \App\Services\BirthdayBook::settings($user),
             'wallets' => WalletService::balances($user),
             'gifts_sent' => Gift::where('sender_id', $user->id)->whereNotIn('status', ['Awaiting Payment', 'Refunded', 'Cancelled'])->count(),
         ];

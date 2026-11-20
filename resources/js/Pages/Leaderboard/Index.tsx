@@ -3,7 +3,12 @@ import { Head, router } from '@inertiajs/react';
 import { AppLayout } from '../../Layouts/AppLayout';
 import { LeaderboardView, type BoardData, type BoardFilters, type BirthdayInput } from '../../Components/leaderboard/LeaderboardView';
 
-const csrf = () => (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content || '';
+// The cookie always holds the current session's token (the meta tag goes stale after sign-in/sign-up).
+const csrfHeaders = (): Record<string, string> => {
+  const m = document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]+)/);
+  if (m) return { 'X-XSRF-TOKEN': decodeURIComponent(m[1]) };
+  return { 'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content || '' };
+};
 
 export default function LeaderboardPage(props: BoardData) {
   const [loading, setLoading] = useState(false);
@@ -18,7 +23,7 @@ export default function LeaderboardPage(props: BoardData) {
   const saveBirthday = async (input: BirthdayInput) => {
     const res = await fetch('/leaderboard/birthday', {
       method: 'POST', credentials: 'same-origin',
-      headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf() },
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...csrfHeaders() },
       body: JSON.stringify(input),
     });
     const d = await res.json().catch(() => ({}));

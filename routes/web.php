@@ -89,6 +89,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/wallet/withdraw', [WalletController::class, 'withdraw'])->name('wallet.withdraw');
     Route::post('/gift/{token}/claim', [WalletController::class, 'claim'])->name('wallet.claim');
     Route::post('/occasions/contacts', [OccasionsController::class, 'storeContact'])->name('contacts.store');
+    Route::post('/occasions/contacts/import', [OccasionsController::class, 'import'])->middleware('throttle:10,1')->name('contacts.import');
+    Route::post('/occasions/settings', [OccasionsController::class, 'settings'])->name('occasions.settings');
     Route::delete('/occasions/contacts/{id}', [OccasionsController::class, 'destroyContact'])->name('contacts.destroy');
 
     // Admin & Staff Area

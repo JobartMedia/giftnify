@@ -54,14 +54,27 @@ class AuthController extends Controller
             'name' => 'required|string|max:80',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => ['required', 'confirmed', Password::defaults()],
+            'phone' => 'nullable|string|max:40',
+            'birth_day' => 'required|integer|min:1|max:31',
+            'birth_month' => 'required|integer|min:1|max:12',
+            'birthday_visible' => 'boolean',
+        ], [
+            'birth_day.required' => 'Pick the day of your birthday.',
+            'birth_month.required' => 'Pick the month of your birthday.',
         ]);
+        if (!checkdate((int)$validated['birth_month'], (int)$validated['birth_day'], 2000)) {
+            return back()->withErrors(['birth_day' => 'That date does not exist.'])->withInput();
+        }
 
         $user = User::create([
             'name' => $validated['name'],
-            'email' => $validated['email'],
+            'email' => strtolower($validated['email']),
             'password' => Hash::make($validated['password']),
             'role' => 'user', // staff are created with: php artisan giftnify:make-admin
-        ]);
+            'phone' => trim((string)($validated['phone'] ?? '')) ?: null,
+            'birthday_visible' => (bool)($validated['birthday_visible'] ?? true),
+            'country' => 'NG',
+        ] + \App\Services\BirthdayBook::birthdayFromRequest($validated));
 
         Auth::login($user);
         $request->session()->regenerate();
@@ -70,6 +83,8 @@ class AuthController extends Controller
         if (!str_starts_with($redirect, '/') || str_starts_with($redirect, '//')) {
             $redirect = '/';
         }
+        // New accounts with nowhere else to go: add the people you love first.
+        if ($redirect === '/') $redirect = '/occasions?welcome=1';
         return redirect()->intended($redirect);
     }
 

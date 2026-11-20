@@ -4,14 +4,19 @@ import { AlertTriangle } from 'lucide-react';
 import { Wordmark } from '../../Layouts/AppLayout';
 import { RevealTheatre, type RevealApi, type RevealGift, type RedeemResult } from '../../Components/reveal/RevealTheatre';
 
-const csrf = () => (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content || '';
+// The cookie always holds the current session's token (the meta tag goes stale after sign-in/sign-up).
+const csrfHeaders = (): Record<string, string> => {
+  const m = document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]+)/);
+  if (m) return { 'X-XSRF-TOKEN': decodeURIComponent(m[1]) };
+  return { 'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content || '' };
+};
 
 async function post(url: string, body: unknown) {
   const isForm = body instanceof FormData;
   return fetch(url, {
     method: 'POST',
     credentials: 'same-origin',
-    headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf(), ...(isForm ? {} : { 'Content-Type': 'application/json' }) },
+    headers: { Accept: 'application/json', ...csrfHeaders(), ...(isForm ? {} : { 'Content-Type': 'application/json' }) },
     body: isForm ? body : JSON.stringify(body),
   });
 }

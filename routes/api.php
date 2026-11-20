@@ -66,6 +66,7 @@ Route::prefix('v1')->name('api.v1.')->middleware(OptionalApiUser::class)->group(
         Route::post('/me/birthday', [\App\Http\Controllers\LeaderboardController::class, 'birthday'])->middleware('throttle:20,1');
         Route::get('/contacts', [AppApiController::class, 'contacts']);
         Route::post('/contacts', [AppApiController::class, 'storeContact']);
+        Route::post('/contacts/import', [AppApiController::class, 'importContacts'])->middleware('throttle:10,1');
         Route::delete('/contacts/{id}', [AppApiController::class, 'destroyContact']);
     });
 });

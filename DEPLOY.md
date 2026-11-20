@@ -81,6 +81,8 @@ Gifts set to open at a later time are released by `php artisan giftnify:release-
 * * * * * cd /path/to/giftnify && php artisan schedule:run >> /dev/null 2>&1
 ```
 
+The same cron also sends birthday reminder emails every morning at 8am (Lagos time), 7 days and 1 day before the birthdays of people each user has saved. Email must be set up (MAIL_* in `.env`).
+
 Without it, the teaser ("Something is coming…") still goes out, but the real gift notification is never sent at the unlock time. The recipient's link still opens itself when the countdown ends.
 
 Uploaded profile photos for creator gift links live on the `public` disk, so run `php artisan storage:link` once.
