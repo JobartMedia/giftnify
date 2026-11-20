@@ -26,6 +26,7 @@ Route::prefix('v1')->name('api.v1.')->middleware(OptionalApiUser::class)->group(
 
     // Shared content
     Route::get('/content', [AppApiController::class, 'content']);
+    Route::get('/leaderboard', [\App\Http\Controllers\LeaderboardController::class, 'show']);
     Route::get('/banks', [AppApiController::class, 'banks']);
     Route::post('/support', [AppApiController::class, 'support']);
 
@@ -62,6 +63,7 @@ Route::prefix('v1')->name('api.v1.')->middleware(OptionalApiUser::class)->group(
         Route::post('/wallet/withdraw', [WalletController::class, 'withdraw']);
         Route::post('/gifts/{token}/claim', [WalletController::class, 'claim']);
 
+        Route::post('/me/birthday', [\App\Http\Controllers\LeaderboardController::class, 'birthday'])->middleware('throttle:20,1');
         Route::get('/contacts', [AppApiController::class, 'contacts']);
         Route::post('/contacts', [AppApiController::class, 'storeContact']);
         Route::delete('/contacts/{id}', [AppApiController::class, 'destroyContact']);

@@ -2,7 +2,7 @@ import React, { ReactNode, useEffect } from 'react';
 import { toast } from 'sonner';
 import { InstallPrompt } from '../Components/InstallPrompt';
 import { Link, usePage } from '@inertiajs/react';
-import { Sparkles, Gift, CalendarHeart, Plus, Activity, Home, Shield, LogOut, Wallet } from 'lucide-react';
+import { Gift, Trophy, CalendarHeart, Plus, Activity, Home, Shield, LogOut, Wallet } from 'lucide-react';
 
 interface Props {
   children: ReactNode;
@@ -27,6 +27,7 @@ const DESKTOP_NAV = [
   { href: '/', label: 'Home' },
   { href: '/giftsense', label: 'Giftgenie A.i' },
   { href: '/creator', label: 'My gift link' },
+  { href: '/leaderboard', label: 'Leaderboard' },
   { href: '/occasions', label: 'Occasions' },
   { href: '/demo', label: 'Sample unboxing' },
   { href: '/help', label: 'Help' },
@@ -52,7 +53,7 @@ export const AppLayout: React.FC<Props> = ({ children }) => {
 
   const mobileNav = [
     { href: '/', label: 'Home', icon: Home },
-    { href: '/giftsense', label: 'Gift Ideas', icon: Sparkles },
+    { href: '/leaderboard', label: 'Leaderboard', icon: Trophy },
     { href: '/create', label: 'Create', icon: Plus, primary: true },
     { href: user ? '/activity' : '/login', label: 'Activity', icon: Activity, match: '/activity' },
     user
@@ -62,7 +63,7 @@ export const AppLayout: React.FC<Props> = ({ children }) => {
 
   // Signed-in: the wallet chip sits in the header, Help and the sample move to the footer.
   const navItems = user
-    ? [...DESKTOP_NAV.slice(0, 4), { href: '/activity', label: 'Activity' }]
+    ? [...DESKTOP_NAV.slice(0, 5), { href: '/activity', label: 'Activity' }]
     : DESKTOP_NAV;
 
   const mainBalance = (user?.wallets ?? []).find((w: any) => w.balance > 0);
@@ -196,6 +197,7 @@ export const AppLayout: React.FC<Props> = ({ children }) => {
               {[
                 ['/create', 'Send a mystery gift'],
                 ['/creator', 'Get your gift link'],
+                ['/leaderboard', 'Birthday leaderboard'],
                 ['/giftsense', 'Giftgenie A.i ideas'],
                 ['/occasions', 'Occasions & reminders'],
                 ['/demo', 'Sample unboxing'],

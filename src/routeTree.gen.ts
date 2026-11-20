@@ -17,6 +17,7 @@ import { Route as CreateRouteImport } from './routes/create'
 import { Route as DemoRouteImport } from './routes/demo'
 import { Route as GiftsenseRouteImport } from './routes/giftsense'
 import { Route as HelpRouteImport } from './routes/help'
+import { Route as LeaderboardRouteImport } from './routes/leaderboard'
 import { Route as OccasionsRouteImport } from './routes/occasions'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as ProfileRouteImport } from './routes/profile'
@@ -78,6 +79,11 @@ const GiftsenseRoute = GiftsenseRouteImport.update({
 const HelpRoute = HelpRouteImport.update({
   id: '/help',
   path: '/help',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LeaderboardRoute = LeaderboardRouteImport.update({
+  id: '/leaderboard',
+  path: '/leaderboard',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OccasionsRoute = OccasionsRouteImport.update({
@@ -212,6 +218,7 @@ export interface FileRoutesByFullPath {
   '/demo': typeof DemoRoute
   '/giftsense': typeof GiftsenseRoute
   '/help': typeof HelpRoute
+  '/leaderboard': typeof LeaderboardRoute
   '/occasions': typeof OccasionsRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
@@ -244,6 +251,7 @@ export interface FileRoutesByTo {
   '/demo': typeof DemoRoute
   '/giftsense': typeof GiftsenseRoute
   '/help': typeof HelpRoute
+  '/leaderboard': typeof LeaderboardRoute
   '/occasions': typeof OccasionsRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
@@ -277,6 +285,7 @@ export interface FileRoutesById {
   '/demo': typeof DemoRoute
   '/giftsense': typeof GiftsenseRoute
   '/help': typeof HelpRoute
+  '/leaderboard': typeof LeaderboardRoute
   '/occasions': typeof OccasionsRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
@@ -311,6 +320,7 @@ export interface FileRouteTypes {
     | '/demo'
     | '/giftsense'
     | '/help'
+    | '/leaderboard'
     | '/occasions'
     | '/privacy'
     | '/profile'
@@ -343,6 +353,7 @@ export interface FileRouteTypes {
     | '/demo'
     | '/giftsense'
     | '/help'
+    | '/leaderboard'
     | '/occasions'
     | '/privacy'
     | '/profile'
@@ -375,6 +386,7 @@ export interface FileRouteTypes {
     | '/demo'
     | '/giftsense'
     | '/help'
+    | '/leaderboard'
     | '/occasions'
     | '/privacy'
     | '/profile'
@@ -409,6 +421,7 @@ export interface RootRouteChildren {
   DemoRoute: typeof DemoRoute
   GiftsenseRoute: typeof GiftsenseRoute
   HelpRoute: typeof HelpRoute
+  LeaderboardRoute: typeof LeaderboardRoute
   OccasionsRoute: typeof OccasionsRoute
   PrivacyRoute: typeof PrivacyRoute
   ProfileRoute: typeof ProfileRoute
@@ -478,6 +491,13 @@ declare module '@tanstack/react-router' {
       path: '/help'
       fullPath: '/help'
       preLoaderRoute: typeof HelpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/leaderboard': {
+      id: '/leaderboard'
+      path: '/leaderboard'
+      fullPath: '/leaderboard'
+      preLoaderRoute: typeof LeaderboardRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/occasions': {
@@ -698,6 +718,7 @@ const rootRouteChildren: RootRouteChildren = {
   DemoRoute: DemoRoute,
   GiftsenseRoute: GiftsenseRoute,
   HelpRoute: HelpRoute,
+  LeaderboardRoute: LeaderboardRoute,
   OccasionsRoute: OccasionsRoute,
   PrivacyRoute: PrivacyRoute,
   ProfileRoute: ProfileRoute,

@@ -43,6 +43,9 @@ Route::post('/gift/verify-bank', [RedemptionController::class, 'verifyBank'])->n
 Route::get('/@{username}', [\App\Http\Controllers\CreatorController::class, 'show'])
     ->where('username', '[A-Za-z0-9_]{3,30}')->name('creator.show');
 
+// Birthday leaderboard (public board; your rank needs sign-in)
+Route::get('/leaderboard', [\App\Http\Controllers\LeaderboardController::class, 'index'])->name('leaderboard');
+
 // GiftSense AI
 Route::get('/giftsense', [GiftSenseController::class, 'index'])->name('giftsense.index');
 Route::post('/giftsense/generate', [GiftSenseController::class, 'generate'])->name('giftsense.generate');
@@ -78,6 +81,7 @@ Route::middleware('auth')->group(function () {
     // My gift link (creator)
     Route::get('/creator', [\App\Http\Controllers\CreatorController::class, 'edit'])->name('creator.edit');
     Route::post('/creator', [\App\Http\Controllers\CreatorController::class, 'update'])->name('creator.update');
+    Route::post('/leaderboard/birthday', [\App\Http\Controllers\LeaderboardController::class, 'birthday'])->middleware('throttle:20,1')->name('leaderboard.birthday');
     Route::post('/creator/gifts/{token}/wall', [\App\Http\Controllers\CreatorController::class, 'wall'])->name('creator.wall');
 
     // Wallet

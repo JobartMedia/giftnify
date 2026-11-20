@@ -1,7 +1,7 @@
 import logoDark from "@/assets/brand/logo.webp";
 import logoLight from "@/assets/brand/logo-light.webp";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Home, Plus, Gift, Activity, User, ChevronLeft, Sparkles, Bell, Wallet } from "lucide-react";
+import { Home, Plus, Gift, Activity, User, ChevronLeft, Trophy, Bell, Wallet } from "lucide-react";
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
@@ -72,7 +72,7 @@ export function PageHeader({ title, back, right }: { title: string; back?: strin
 
 const NAV = [
   { to: "/", label: "Home", icon: Home },
-  { to: "/giftsense", label: "Gift Ideas", icon: Sparkles },
+  { to: "/leaderboard", label: "Leaderboard", icon: Trophy },
   { to: "/create", label: "Create", icon: Plus },
   { to: "/wallet", label: "Wallet", icon: Wallet },
   { to: "/profile", label: "Profile", icon: User },
@@ -81,6 +81,7 @@ const NAV = [
 const TOP_NAV = [
   { to: "/", label: "Home" },
   { to: "/giftsense", label: "Gift Ideas" },
+  { to: "/leaderboard", label: "Leaderboard" },
   { to: "/occasions", label: "Occasions" },
   { to: "/activity", label: "Activity" },
   { to: "/wallet", label: "Wallet" },

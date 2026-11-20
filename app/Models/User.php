@@ -22,6 +22,12 @@ class User extends Authenticatable
         'phone',
         'status',
         'username',
+        'birth_month',
+        'birth_day',
+        'birthday_set_at',
+        'leaderboard_opt_in',
+        'city',
+        'country',
         'bio',
         'creator_enabled',
         'creator_currency',
@@ -42,6 +48,10 @@ class User extends Authenticatable
             'creator_enabled' => 'boolean',
             'creator_amounts' => 'array',
             'creator_wall' => 'boolean',
+            'birth_month' => 'integer',
+            'birth_day' => 'integer',
+            'birthday_set_at' => 'datetime',
+            'leaderboard_opt_in' => 'boolean',
         ];
     }
 
